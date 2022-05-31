@@ -93,6 +93,7 @@ class ImputeIterator:
         self.idx_fix = None
         self.idx_visti = None
         self.idx_maivisti = None
+        self.idx_predict=None
         self.X = None
         self.y = None
         self.target_name = None
@@ -158,11 +159,13 @@ class ImputeIterator:
         self.score_fit.append([r2_fit, mse_fit])
         self.first_model = model
 
-    def impute(self, target, maivisti_size=0.25, idx_maivisti=None):
+    def impute(self, target,
+               maivisti_size=0.25, idx_maivisti=None, idx_predict=None):
         if self.fitted:
             self.target_name = target.columns[0]
             self.maivisti_size = int(len(self.target) * maivisti_size)
             self.idx_maivisti = idx_maivisti
+            self.idx_predict = idx_predict
             self.max_score = 0
             self.iterative_imputation()
             self.__print_ending()
@@ -243,15 +246,30 @@ class ImputeIterator:
         # TODO prenderli dalle misure di Target ottenute:
         # Al posto di prendere l'index di train si prende quello di test,
         # che deve contenere solo dati di Target Misurato.
+        if self.idx_predict is not None:
+            predict_len = int(
+                len(self.fts_visti.index) * (1-self.train_fraction)
+                )
+            idx_predict_imputed = self.RNG.choice(
+                idx_free,
+                size=int(predict_len/2),
+                replace=False,
+            )
+            idx_predict_measured = self.idx_predict[:int(predict_len/2)]
 
-        idx_train = self.RNG.choice(
-            self.fts_visti.index,
-            size=int(len(self.fts_visti.index) * self.train_fraction),
-            replace=False,
-        )
-        idx_predict = [
-            idx for idx in self.fts_visti.index if idx not in idx_train
-            ]
+            idx_predict = np.append(idx_predict_imputed, idx_predict_measured)
+            idx_train = [
+                idx for idx in self.fts_visti.index if idx not in idx_predict
+                ]
+        else:
+            idx_train = self.RNG.choice(
+                self.fts_visti.index,
+                size=int(len(self.fts_visti.index) * self.train_fraction),
+                replace=False,
+            )
+            idx_predict = [
+                idx for idx in self.fts_visti.index if idx not in idx_train
+                ]
         # Quanti punti effettivamente misurati stanno nel set di Test?
         predicted_measures = [
             idx for idx in idx_predict if idx not in idx_free
@@ -278,7 +296,10 @@ class ImputeIterator:
         return temp, test_score, measured_rateo
 
     def internal_test(self, train, test, subset=None):
-        """Prova l'imputazione con un test sui dati visti."""
+        """
+        Prova l'imputazione con un test sui dati visti.
+        Se viene fornito un subset, calcola i punteggi solo in quel subset.
+        """
         X_train, y_train = train
         X_test, y_test = test
         self.model.fit(X_train.to_numpy(), y_train.values.ravel())
@@ -380,8 +401,8 @@ class ImputeIterator:
         # Addestra sui dati Visti
         if refit:
             model.set_params(warm_start=False)
-            for epoch in range(self.EPOCHS):
-                model.fit(X_train.to_numpy(), y_train.values.ravel())
+
+            model.fit(X_train.to_numpy(), y_train.values.ravel())
             # print('fit score maivisti')
             # self.score_fit.append(
             #     model.score(X_train.to_numpy(), y_train.values.ravel()))
@@ -610,70 +631,82 @@ class ImputeIterator:
 
 if __name__ == '__main__':
 
-    DATABASE = '../CSV/db_villabate_deficit_3.csv'
+    import copy
+
+    DATABASE = '../CSV/db_villabate_deficit_6.csv'
+
+    ITER_LIMIT = 10
+    INVALID_LIM = 10000
+    MV_FRACTION = 0.2
+    FIT_FRACTION = 0.8
+
+    COLUMNS = [
+        'Rs', 'U2', 'RHmin', 'RHmax',
+        'Tmin', 'Tmax', 'SWC',
+        'NDVI', 'NDWI', 'DOY'
+        ]
 
     features = et.make_dataframe(
         DATABASE,
-        columns=['θ 10', 'θ 20', 'θ 30', 'θ 40', 'θ 50', 'θ 60', 'U 2',
-                 'Rs', 'RHmin', 'RHmax', 'Tmin', 'Tmax', 'ETo'],
+        date_format='%Y-%m-%d',
+        columns=COLUMNS,
         start='2018-01-01',
         method='impute',
         nn=5,
         drop_index=True,
         )
-    # PULIZIA
-    # Si rimuovono le misure di Febbraio 2020, poco significative
-    features.drop(index=features.loc['2020-02'].index, inplace=True)
 
-    # Si inseriscono i contenuti idrici al suolo medi
-    features.insert(6, 'soil_humidity', features.iloc[:, 0:6].mean(axis=1))
-    # e si eliminano quelli alle diverse profondità
-    features.drop(features.columns[0:6], axis=1, inplace=True)
-    features.insert(0, 'gregorian_day', features.index.dayofyear)
-
-    target = et.make_dataframe(
+    eta = et.make_dataframe(
         DATABASE,
+        date_format='%Y-%m-%d',
         columns=['ETa'],
-        start='2018-01-01',
+        start='2019-01-01',
         method='drop',
         drop_index=True,
         )
 
-    iter_limit = 2
-    inv_series_lim = 10
-    it = ImputeIterator(iter_limit=iter_limit, inv_series_lim=inv_series_lim,
-                        verbose=True)
-    it.fit(features, target)
-    imputed = it.impute(target)
-    # imputed = it.fit_imputed(features, target)
+    # Si prendono gli indici (date) di ETa
+    eta_idx = copy.deepcopy(eta.index.values)
+    # e si mescolano in modo random
+    RNG = np.random.default_rng(seed=6475)
+    RNG.shuffle(eta_idx)
+    num_maivisti = int(MV_FRACTION*len(eta_idx))
+    num_predict = int(FIT_FRACTION*len(eta_idx))
+    idx_maivisti = eta_idx[: num_maivisti]
+    idx_predict = eta_idx[-num_predict:]
+    # make Timestamps
+    idx_predict = [pd.Timestamp(idx) for idx in idx_predict]
 
-    imputed_measures_idx = [
-        idx for idx in imputed.index if idx in target.index
-        ]
-    mse = mean_squared_error(target.loc[imputed_measures_idx],
-                             imputed.loc[imputed_measures_idx])
+    it = ImputeIterator(iter_limit=ITER_LIMIT,
+                        inv_series_lim=INVALID_LIM,
+                        verbose=True,
+                        output_freq=1)
+    it.fit(features, eta)
+    # Gli indici dei dati MaiVisti vengono inseriti nell'Imputatore
+    imputed = it.impute(eta,
+                        idx_maivisti=idx_maivisti, idx_predict=idx_predict)
+
+    # Indici delle misure viste (usate per l'imputazione)
+    idx_fix = [idx for idx in imputed.index if idx in eta.index]
+    idx_free = [idx for idx in imputed.index if idx not in eta.index]
 
     # %% PLOTS
-    # ETa Imputed
-    fig, ax = plt.subplots(figsize=(8, 6))
-    fig.suptitle(f'Iterative Imputation of ETa for {iter_limit} iterations',
-                 fontsize=18)
-    et.plot_axis(ax, [target.index, target.values, 'red'],
-                 plot_type='scatter', date_ticks=3, legend='Measured')
-    et.plot_axis(ax, [imputed.index, imputed.values, 'blue'],
-                 plot_type='scatter', legend='Imputed')
-    ax.set_ylabel('ETa [mm/day]', fontsize=10)
-    # ax.set_title(f'MSE Measured-Imputed: {mse:.4}',
-    #              color='gray', fontsize=14)
-    ax.legend()
+    # Si crea una colonna di etichette per i dati di ETa
+    eta_total = pd.concat([imputed.to_frame(name='ETa'),
+                           eta.loc[idx_maivisti]]).sort_index()
+    eta_total['source'] = [
+        'Predictors' if i in idx_predict
+        else 'Misurati' if i in idx_fix
+        else 'Mai Visti' if i in idx_maivisti
+        else 'Imputed' for i in eta_total.index]
+    eta_total.index.name = 'Day'
 
-    # Validation Score
-    fig, ax = plt.subplots(figsize=(8, 6))
-    fig.suptitle(f'Validation Score for {iter_limit} iterations', fontsize=18)
-    et.plot_axis(ax, [np.arange(len(it.score_mv)), it.score_mv])
-    ax.axhline(max(it.score_mv)[0], c='red', ls='--')
-    ax.text(0.1, max(it.score_mv)[0], f'Max = {max(it.score_mv)[0]:.2}',
-            c='red', bbox={'facecolor': 'white'}, fontsize=12)
-    ax.legend(['MaiVisti R2', 'MaiVisti RMSE', 'Measured ratio (InternalTest)'])
-    ax.set_ylabel('Validation Score')
-    ax.grid()
+    # Plot ETa vs Time
+    sns.relplot(
+        height=5, aspect=1.61,
+        data=eta_total,
+        x='Day', y='ETa',
+        style='source', hue='source')
+    plt.xticks(rotation=90)
+    plt.title(f'Final Imputation: max $R^2 = {it.max_score:0.4}$')
+    plt.show()
