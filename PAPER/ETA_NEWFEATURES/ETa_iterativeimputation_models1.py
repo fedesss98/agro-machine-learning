@@ -22,12 +22,12 @@ from sklearn.metrics import mean_squared_error
 from MODULES.imputiteratorClass import ImputeIterator
 from MODULES import et_functions as et
 
-DATABASE = '../../CSV/db_villabate_deficit_7.csv'
+DATABASE = '../../CSV/db_villabate_deficit_6.csv'
 SAVE = True
 
 KFOLDS = 4
 
-ITER_LIMIT = 1000
+ITER_LIMIT = 3
 INVALID_LIM = 10000
 
 MODELS_FEATURES = [
@@ -51,7 +51,7 @@ eta = et.make_dataframe(
     DATABASE,
     date_format='%Y-%m-%d',
     columns=['ETa'],
-    start='2019-03-13',
+    start='2018-01-01',
     method='drop',
     drop_index=True,
     )
@@ -84,7 +84,7 @@ for n in range(KFOLDS):
             DATABASE,
             date_format='%Y-%m-%d',
             columns=columns,
-            start='2019-03-13',
+            start='2018-01-01',
             method='impute',
             nn=5,
             drop_index=True,
@@ -159,5 +159,5 @@ for n in range(KFOLDS):
             style='source', hue='source')
         plt.xticks(rotation=90)
         plt.suptitle(f'Model {i+1} - Fold {n+1}')
-        plt.title(f'Final Imputation: max $R^2 = {it.max_score:0.4}$')
+        # plt.title(f'Final Imputation: max $R^2 = {it.max_score:0.4}$')
         plt.show()

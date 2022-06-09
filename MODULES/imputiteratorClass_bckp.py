@@ -98,11 +98,11 @@ class ImputeIterator:
 
     def description(self):
         desc = ('Classe Imputiterator\n'
-               'Fitta su Features X e imputa il set target.\n'
-               '_________\nParametri:\n'
-               f'Invalid Series Limit = {self.invalid_series_limit}\n'
-               f'Iterations Limit: {self.iter_limit}\n'
-               f'Train Fraction: {self.train_fraction}')
+                'Fitta su Features X e imputa il set target.\n'
+                '_________\nParametri:\n'
+                f'Invalid Series Limit = {self.invalid_series_limit}\n'
+                f'Iterations Limit: {self.iter_limit}\n'
+                f'Train Fraction: {self.train_fraction}')
 
         return desc
 
@@ -110,7 +110,7 @@ class ImputeIterator:
         self.fitted = True
         self.X = X
 
-    def impute(self, target, maivisti_size = 0.25):
+    def impute(self, target, maivisti_size=0.25):
         if self.fitted:
             # Si trasforma la Serie in DataFrame
             if isinstance(target, pd.Series):
@@ -127,7 +127,7 @@ class ImputeIterator:
 
         return self.y
 
-    def fit_impute(self, X, target, maivisti_size = 0.25):
+    def fit_impute(self, X, target, maivisti_size=0.25):
         self.fitted = True
         self.X = X
         self.target = target
@@ -176,9 +176,11 @@ class ImputeIterator:
     def __step1(self, idx_free):
         """
         IMPUTAZIONE
-        Si fa un Addestramento di un Regressore su una frazione del set Completo.
+        Si fa un Addestramento di un Regressore su una frazione del set
+        Completo.
         Si fa una Predizione sul resto del set.
-        Si sovrascrivono questi dati Predetti a quelli precedentemente Imputati,
+        Si sovrascrivono questi dati Predetti a quelli precedentemente
+        Imputati,
         senza toccare quelli Misurati.
         Si ottiene una Serie temporanea di Target, da Validare.
         Parameters
@@ -195,19 +197,25 @@ class ImputeIterator:
             (Misurati e Imputati al passo prima).
 
         """
-        idx_train = self.rng.choice(self.features_visti.index,
-                                     size=int(len(self.features_visti.index)*self.train_fraction),
-                                     replace=False)
-        idx_predict = [idx for idx in self.features_visti.index if idx not in idx_train]
+        idx_train = self.rng.choice(
+            self.features_visti.index,
+            size=int(len(self.features_visti.index)*self.train_fraction),
+            replace=False)
+        idx_predict = [idx for idx in self.features_visti.index
+                       if idx not in idx_train]
         # Quanti punti effettivamente misurati stanno nel set di Test?
         predict_in_fix = [idx for idx in idx_predict if idx not in idx_free]
         measured_rateo = len(predict_in_fix)/len(idx_predict)
 
-        X_train, y_train = self.features_visti.loc[idx_train], self.y.loc[idx_train]
-        X_predict , y_test = self.features_visti.loc[idx_predict], self.y.loc[idx_predict]
+        X_train = self.features_visti.loc[idx_train]
+        y_train = self.y.loc[idx_train]
+        X_predict = self.features_visti.loc[idx_predict]
+        y_test = self.y.loc[idx_predict]
 
         self.model.fit(X_train, y_train)
-        y_predict = pd.Series(self.model.predict(X_predict), index=idx_predict, name='Target Imputed')
+        y_predict = pd.Series(
+            self.model.predict(X_predict),
+            index=idx_predict, name='Target Imputed')
         # Si calcola il Test Score
         test_score = r2_score(y_test, y_predict)
 
@@ -326,7 +334,8 @@ class ImputeIterator:
     def print_output(self, i, valid_iter, maivisti_mse):
         inserted = u'\u2713' if valid_iter else 'X'
         if self.verbose:
-            print(f'{i:<}\t{self.score_t[-1]:>10.4}({self.measured_rateo[-1]:.0%})'
+            print(f'{i:<}\t{self.score_t[-1]:>10.4}'
+                  f'({self.measured_rateo[-1]:.0%})'
                   f'\t{self.score_v[-1]:>15.4}'
                   f'\t{self.score_mv[-1]:>7.2}({math.sqrt(maivisti_mse):^6.2})'
                   f'\t{inserted:>8}')
@@ -338,39 +347,41 @@ class ImputeIterator:
               f'Best Validation Score: {self.max_score}\n'
               f'Best MaiVisti Score: {max(self.score_mv)}')
 
-
     @staticmethod
     def scale(df):
         scaler = StandardScaler()
         df = pd.DataFrame(scaler.fit_transform(df),
-                         index = df.index,
-                         columns = df.columns)
+                          index=df.index,
+                          columns=df.columns)
         return df
 
     @staticmethod
     def scale_series(s, name='Serie'):
         scaler = StandardScaler()
-        s = pd.Series(scaler.fit_transform(s.values.reshape(-1,1)).reshape(len(s)),
-                      index=s.index,
-                      name = name)
+        s = pd.Series(
+            scaler.fit_transform(s.values.reshape(-1, 1)).reshape(len(s)),
+            index=s.index, name=name
+            )
         return s
 
-    #%% MAIN PROGRAM
+    # %% MAIN PROGRAM
 
     def main(self):
-        features_names = [cols for cols in self.X.columns if cols != self.target_name]
+        features_names = [cols for cols in self.X.columns
+                          if cols != self.target_name]
         # Si blocca un certo numero di misure di Target
         # da non usare nell'Imputazione,
         # per usarle poi come controllo nel Test Maivisti
         idx_maivisti = self.rng.choice(self.target.index,
-                                     size=self.maivisti_size,
-                                     replace=False)
+                                       size=self.maivisti_size,
+                                       replace=False)
         self.target_maivisti = self.target.loc[idx_maivisti]
         # Si prendono le date di queste misure bloccate
         # E si tirano via di conseguenza le features legate a questi Target
         self.features_maivisti = self.X.loc[idx_maivisti, features_names]
         # Il resto del Target potrà essere usato (visto) per l'Imputazione
-        idx_visti = [idx for idx in self.target.index if idx not in idx_maivisti]
+        idx_visti = [idx for idx in self.target.index
+                     if idx not in idx_maivisti]
         self.target_visti = self.target.loc[idx_visti]
 
         # Si prendono quindi tutte le rimanenti date
@@ -390,7 +401,8 @@ class ImputeIterator:
         # Date con misure del Target: non dovranno essere toccate
         idx_fix = self.target_visti.index
         # Le restanti date sono libere di essere sovrascritte nell'Imputazione
-        idx_free = [idx for idx in self.features_visti.index if idx not in idx_fix]
+        idx_free = [idx for idx in self.features_visti.index
+                    if idx not in idx_fix]
 
         # STEP 0 - PRIMO SCORE
         score0 = self.__step0(idx_free, idx_fix)
@@ -401,9 +413,10 @@ class ImputeIterator:
 
         # CICLO DI IMPUTAZIONE
         # Variabili di controllo del ciclo
-        i = 0 # Cicli eseguiti
+        i = 0  # Cicli eseguiti
 
-        while self.n_invalid_series < self.invalid_series_limit and i < self.iter_limit:
+        while (self.n_invalid_series < self.invalid_series_limit
+               and i < self.iter_limit):
             # STEP 1 - IMPUTAZIONE
             temp, test_score, rateo = self.__step1(idx_free)
             self.score_t.append(test_score)
@@ -420,13 +433,13 @@ class ImputeIterator:
             self.score_mv.append(maivisti_score)
 
             # Output finale con i tre punteggi
-            self.print_output(i,valid_iter,maivisti_mse)
+            self.print_output(i, valid_iter, maivisti_mse)
             # Continua con le iterazioni
             i = i + 1
 
-        y = self.y.values.reshape(-1,1)
+        y = self.y.values.reshape(-1, 1)
         y = StandardScaler().fit(self.target).inverse_transform(y).ravel()
-        self.y = pd.Series(y, name='Target Imputed', index = idx_visti)
+        self.y = pd.Series(y, name='Target Imputed', index=idx_visti)
 
     def plot_imputation(self, **kwargs):
         # Si riprendono le misure non scalate del Target
@@ -435,13 +448,16 @@ class ImputeIterator:
         # E i soli dati Imputati
         y_imputed = self.y[~self.y.index.isin(self.target.index)]
 
-        fig,ax = plt.subplots()
+        fig, ax = plt.subplots()
         fig.suptitle(f'Iterative imputation of {self.target_name} '
                      f'for {self.iter_limit} iterations')
         # idx_imputed = self.y.join(self.target)
-        et.plot_axis(ax,[y_imputed.index, y_imputed.values],
-                     plot_type='scatter', alpha=0.4)
-        et.plot_axis(ax,[target_maivisti.index, target_maivisti.values, 'red'],
-                      legend='MaiVisti', plot_type='scatter')
-        et.plot_axis(ax,[target_visti.index, target_visti.values, 'green'],
-                      legend='Visti', plot_type='scatter')
+        et.plot_axis(
+            ax, [y_imputed.index, y_imputed.values],
+            plot_type='scatter', alpha=0.4)
+        et.plot_axis(
+            ax, [target_maivisti.index, target_maivisti.values, 'red'],
+            legend='MaiVisti', plot_type='scatter')
+        et.plot_axis(
+            ax, [target_visti.index, target_visti.values, 'green'],
+            legend='Visti', plot_type='scatter')

@@ -21,9 +21,9 @@ from MODULES import et_functions as et
 DATABASE = '../../CSV/db_villabate_deficit_6.csv'
 SAVE = True
 
-KFOLDS = 10
+KFOLDS = 4
 
-ITER_LIMIT = 100
+ITER_LIMIT = 5
 INVALID_LIM = 10000
 
 MODELS_FEATURES = [
@@ -47,7 +47,7 @@ eta = et.make_dataframe(
     DATABASE,
     date_format='%Y-%m-%d',
     columns=['ETa'],
-    start='2019-01-01',
+    start='2018-01-01',
     method='drop',
     drop_index=True,
     )

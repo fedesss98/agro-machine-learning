@@ -4,21 +4,25 @@
 Created on Thu Mar 17 09:18:50 2022
 
 @author: Federico Amato
-Si cerca di ottenere la miglior prima imputazione di tutti i dati di ETa
-a partire da quelli misurati.
+Modelli classici di ML applicati al dataset di ETa,
+con diverse features in ingresso.
 """
+import copy
 import matplotlib.pyplot as plt
-import math
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
 import seaborn as sns
 
-from sklearn.impute import KNNImputer
+from sklearn.linear_model import HuberRegressor
+from sklearn.linear_model import RANSACRegressor
+from sklearn.linear_model import TheilSenRegressor
 from sklearn.preprocessing import StandardScaler
 from sklearn.neural_network import MLPRegressor
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.model_selection import train_test_split
+
+from sklearn.model_selection import cross_val_score
+from sklearn.model_selection import RepeatedKFold
 from sklearn.metrics import mean_squared_error, r2_score
 
 import MODULES.et_functions as et
@@ -43,142 +47,247 @@ def scale_sets(X_train, y_train, X_test, y_test):
     return X_train, y_train.ravel(), X_test, y_test.ravel()
 
 
-def plot_scores(scores):
-    fig = plt.figure()
-    plt.plot(np.arange(EPOCHS+1), scores[:, 0], c='blue', alpha=0.4)
-    plt.plot(np.arange(EPOCHS+1), scores[:, 0], c='green', alpha=0.4)
-    plt.hlines(scores[:, 0].max(), 0, EPOCHS+1, ls='--', color='red')
-    plt.text(0.5, scores[:, 0].max(), f'Max: {scores[:, 0].max():.4f}')
+def get_linear_models():
+    models = dict()
+    models['Huber'] = HuberRegressor()
+    models['RANSAC'] = RANSACRegressor()
+    models['TheilSen'] = TheilSenRegressor()
+    # models['RANSAC'] = RANSACRegressor()
+    # models['TheilSen'] = TheilSenRegressor()
+    return models
+
+
+# evaluate a model
+def evalute_model(X, y, model, name):
+    # define model evaluation method
+    cv = RepeatedKFold(n_splits=10, n_repeats=3, random_state=1)
+    # evaluate model
+    scores = cross_val_score(
+        model, X, y, scoring='neg_mean_absolute_error', cv=cv, n_jobs=-1)
+    # force scores to be positive
+    scores = np.absolute(scores)
+    return scores
+
+
+def plot_imputation(x, y, eta=None, **kwargs):
+    suptitle = (kwargs.get('suptitle') if 'suptitle' in kwargs
+                else 'ETa Imputation')
+    title = kwargs.get('title') if 'title' in kwargs else None
+    # Setup figure
+    fig, ax = plt.subplots(figsize=(10, 6))
+    fig.suptitle(suptitle, fontsize=18, weight='bold')
+    et.plot_axis(ax, grid=True, date_ticks=6,
+                 title=title, xlabel='Time', ylabel='ETa',)
+
+    if eta is not None:
+        et.plot_axis(ax, [eta.index, eta, 'blue', 0.2],
+                     plot_type='scatter', legend='ETa Measured')
+
+    et.plot_axis(ax, [x[0], y[0], 'green'],
+                 plot_type='scatter', legend='ETa Test')
+    et.plot_axis(ax, [x[1], y[1], 'red'],
+                 plot_type='scatter', legend='ETa Prediction')
+    ax.legend()
     plt.show()
 
 
-DATABASE = '../../CSV/db_villabate_deficit_3.csv'
+def plot_linear(x, y, **kwargs):
+    suptitle = (kwargs.get('suptitle') if 'suptitle' in kwargs
+                else 'ETa Regression')
+    title = kwargs.get('title') if 'title' in kwargs else None
+    # Setup figure
+    fig, ax = plt.subplots(figsize=(10, 6))
+    fig.suptitle(suptitle, fontsize=18, weight='bold')
+    et.plot_axis(ax, grid=True, title=title,
+                 xlabel='ETa Measured', ylabel='ETa Predicted',)
+    # Train
+    et.plot_axis(ax, [x[0], y[0], 'blue', 0.25],
+                 plot_type='scatter', legend='Fit Predictions')
+    # Test
+    et.plot_axis(ax, [x[1], y[1], 'red'],
+                 plot_type='scatter', legend='Test Predictions')
+
+    models = get_linear_models()
+    results = dict()
+    for name, model in models.items():
+        # evaluate the model
+        results[name] = evalute_model(
+            x[1].reshape(-1, 1), y[1].values.reshape(-1, 1), model, name)
+        # summarize progress
+        print("Linear Regressions:")
+        print(f'>{name} '
+              f'{np.mean(results[name]):.4} '
+              f'({np.std(results[name]):.4})')
+
+    models['RANSAC'].fit(x[1].reshape(-1, 1), y[1].values.reshape(-1, 1))
+    x_linear = np.linspace(min(x[0]), max(x[0]), 100)
+    y_linear = models['RANSAC'].predict(x_linear.reshape(-1, 1))
+    et.plot_axis(ax, [x_linear, y_linear, 'orange'],
+                 plot_type='line', alpha=1)
+
+    ax.legend()
+    plt.show()
+
+
+def plot_scores(scores):
+    fig, ax = plt.figure()
+    ax.plot(np.arange(EPOCHS+1), scores[:, 0], c='blue', alpha=0.4)
+    ax.plot(np.arange(EPOCHS+1), scores[:, 0], c='green', alpha=0.4)
+    ax.hlines(scores[:, 0].max(), 0, EPOCHS+1, ls='--', color='red')
+    ax.text(0.5, scores[:, 0].max(), f'Max: {scores[:, 0].max():.4f}')
+    plt.show()
+
+
+DATABASE = '../../CSV/db_villabate_deficit_6.csv'
+
+SAVE = False
+
+KFOLDS = 4
+
 EPOCHS = 1
 RANDOM_STATE = 58
 WARM_START = True
 ITERATIONS = 0
 
-df = et.make_dataframe(DATABASE, drop_index=True)
+MODELS_FEATURES = [
+        ['Rs', 'U2', 'RHmin', 'RHmax', 'Tmin',
+         'Tmax', 'SWC', 'NDVI', 'NDWI', 'DOY'],  # 1
+        ['Rs', 'U2', 'RHmax', 'Tmin',
+         'Tmax', 'SWC', 'NDVI', 'NDWI', 'DOY'],  # 2
+        ['Rs', 'U2', 'RHmax', 'Tmax', 'SWC', 'NDVI', 'NDWI', 'DOY'],  # 3
+        ['Rs', 'U2', 'RHmax', 'Tmax', 'SWC', 'NDWI', 'DOY'],  # 4
+        ['Rs', 'U2', 'Tmax', 'SWC', 'NDWI', 'DOY'],   # 5
+        ['Rs', 'U2', 'Tmax', 'SWC', 'DOY'],  # 6
+        ['Rs', 'Tmax', 'SWC', 'DOY'],  # 7
+        ['Rs', 'RHmin', 'RHmax', 'Tmin', 'Tmax'],  # 8
+        ['ETo', 'SWC', 'NDVI', 'NDWI', 'DOY'],  # 9
+        ['ETo', 'NDVI', 'NDWI', 'DOY'],  # 10
+        ['Rs', 'Tmin', 'Tmax', 'DOY'],  # 11
+        ['Rs', 'Tavg', 'RHavg', 'DOY'],  # 12
+    ]
 
-# PULIZIA
-# Si rimuovono le misure di Febbraio 2020, poco significative
-df.drop(index=df.loc['2020-02'].index, inplace=True)
+MLP_PARAMS = {
+    'hidden_layer_sizes': (10, 10, 10),
+    'max_iter': 10000,
+    'random_state': 12,
+    'warm_start': False,
+    }
 
-# Si inseriscono i contenuti idrici al suolo medi
-df.insert(12, 'soil_humidity', df.iloc[:, 0:6].mean(axis=1))
-# e si eliminano quelli alle diverse profondità
-df.drop(df.columns[0:12], axis=1, inplace=True)
-# Si eliminano le Deviazioni degli indici ND
-df.drop(columns=['Std NDWI', 'Std NDVI', 'I', 'P'], inplace=True)
-# E si rinominano gli indici con lo snake_case
-df.rename(columns={'Average NDVI': 'ndvi', 'Average NDWI': 'ndwi'},
-          inplace=True)
-# Si aggiungono i dati temporali
-# df.insert(0, 'day_of_week', df.index.weekday)
-# df.insert(0, 'day_of_month', df.index.day)
-# df.insert(0, 'month', df.index.month)
-df.insert(0, 'gregorian_day', df.index.dayofyear)
+RF_PARAMS = {
+    'n_estimators': 100,
+    'random_state': 12,
+    }
 
-# print('Working Dataframe:\n', df.count())
+PREDICTORS = {
+    'mlp': MLPRegressor(**MLP_PARAMS),
+    'rf': RandomForestRegressor(**RF_PARAMS),
+    }
 
-features = df.iloc[:, 0:-3]
-target = df.iloc[:, -3:]
-target.plot(subplots=True, figsize=(8, 10))
-
-# Si fa una prima imputazione KNN alle features
-imputer = KNNImputer(n_neighbors=5)
-features = pd.DataFrame(imputer.fit_transform(features),
-                        columns=features.columns, index=features.index)
-
-# print('Features Imputed:\n', features.count())
-
-mlp = MLPRegressor(
-    hidden_layer_sizes=(365, 12, 365),
-    random_state=RANDOM_STATE,
-    max_iter=500,
-    warm_start=WARM_START,
-    )
-rf = RandomForestRegressor(
-    n_estimators=365,
-    random_state=RANDOM_STATE,
-    warm_start=WARM_START
+eta = et.make_dataframe(
+    DATABASE,
+    columns='ETa',
+    start='2018-01-01',
+    method='drop',
+    drop_index=True,
     )
 
-model = rf
+# %% CROSS-VALIDATION
+# Si prendono gli indici (date) di ETa
+eta_idx = copy.deepcopy(eta.index.values)
+# e si mescolano in modo random
+RNG = np.random.default_rng(seed=6475)
+RNG.shuffle(eta_idx)
+# Il set di ETa viene diviso in KFOLDS intervalli
+# ogni intervallo è lungo 1/KFOLDS della lunghezza totale
+chunk = int(len(eta_idx)/KFOLDS)
+# Si esegue il programma prendendo di volta in volta come indici (date) dei
+# MaiVisti uno di questi KFOLDS intervalli
 
-y = target['ETa'].dropna()
-X = features.loc[y.index]
+scores = {}
+k_scores = [[0 for i in range(len(MODELS_FEATURES))] for j in range(KFOLDS)]
 
-X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.3, random_state=RANDOM_STATE
-)
-train_idx = X_train.index
+# %% MAIN
+for k in range(KFOLDS):
+    idx_test = eta_idx[k*chunk: (k+1)*chunk]
+    idx_train = [idx for idx in eta_idx if idx not in idx_test]
 
-# SCALING: dopo questo si avranno numpy array
-X_train, y_train, X_test, y_test = scale_sets(X_train, y_train, X_test, y_test)
+    for i, columns in enumerate(MODELS_FEATURES):
+        features = et.make_dataframe(
+            DATABASE,
+            date_format='%Y-%m-%d',
+            columns=columns,
+            start='2018-01-01',
+            method='impute',
+            nn=5,
+            drop_index=True,
+            )
 
-scores = np.zeros((EPOCHS+1, 2))
-print("Predicting ETa")
-for epoch in tqdm(range(EPOCHS)):
-    model.fit(X_train, y_train)
-    # model.set_params(n_estimators=100+10*epoch)
+        target = eta.copy()
 
-    y_predicted = model.predict(X_test)
-    r2 = r2_score(y_test, y_predicted)
-    mse = mean_squared_error(y_test, y_predicted)
-    scores[epoch] = [r2, mse]
+        for predictor in PREDICTORS:
+            print(f'\n{"***":<5} MODEL {i+1} '
+                  f'// k{k+1} '
+                  f'// {predictor} {"***":>5}')
+            model = PREDICTORS[predictor]
 
-imputation_idxs = [idx for idx in features.index if idx not in y.index]
-X_impute = features.loc[imputation_idxs]
-X_impute = StandardScaler().fit_transform(X_impute)
-y_imputed = model.predict(X_impute)
+            X_train = features.loc[idx_train]
+            y_train = target.loc[idx_train]
+            X_test = features.loc[idx_test]
+            y_test = target.loc[idx_test]
 
-# Si ritorna ai DataFrame
-target_imputed = pd.DataFrame(
-    y_imputed, index=imputation_idxs, columns=['ETa'],
-    )
-target_imputed.index.name = 'Day'
-target_train = pd.DataFrame(y_train, index=train_idx, columns=['ETa'])
-target_total = pd.concat([target_imputed, target_train])
+            # Rescaling dei dati
+            X_train, y_train, X_test, y_test = scale_sets(
+                X_train, y_train, X_test, y_test)
+            # Rescaling delle misure
+            target = StandardScaler().fit_transform(
+                target.values.reshape(-1, 1))
+            target = pd.DataFrame(target, index=np.sort(eta_idx))
 
-features_total = features.loc[target_total.index]
-model.fit(features_total.values, target_total.values.ravel())
-y_predicted = model.predict(X_test)
-r2 = r2_score(y_test, y_predicted)
-mse = mean_squared_error(y_test, y_predicted)
-scores[EPOCHS] = [r2, mse]
+            model.fit(X_train, y_train)
+            y_fit_predict = pd.DataFrame(
+                model.predict(X_train),
+                columns=['ETa'],
+                index=idx_train,
+                )
+            y_test_predict = pd.DataFrame(
+                model.predict(X_test),
+                columns=['ETa'],
+                index=idx_test,
+                )
 
-print(f'\nMaiVisti Scores with {model}:\n{"R2":7}\t{"RMSE":7}'
-      f'\n{r2:.4f}\t{math.sqrt(mse):.4f}')
+            # Predictions plot
+            xs = [idx_train, idx_test]
+            ys = [y_fit_predict, y_test_predict]
+            plot_imputation(xs, ys, target,
+                            title=f"Model {i+1} k{k+1} - {predictor}")
 
-plot_scores(scores)
+            # Linear plot
+            xs = [y_train, y_test]
+            ys = [y_fit_predict, y_test_predict]
+            plot_linear(xs, ys,
+                        title=f"Model {i+1} k{k+1} - {predictor}")
 
-target_total['source'] = [
-    'measured' if i in y.index else 'imputed'
-    for i in target_total.index]
-# Si sovrascrivono le imputazioni corrispondenti a misure
+            scores[predictor] = {
+                'train': {
+                    'r2':
+                        r2_score(y_train, y_fit_predict),
+                    'rmse':
+                        np.sqrt(mean_squared_error(y_train, y_fit_predict)),
+                    'mbe':
+                        et.mean_bias_error(y_train, y_fit_predict),
+                    },
+                'test': {
+                    'r2':
+                        r2_score(y_test, y_test_predict),
+                    'rmse':
+                        np.sqrt(mean_squared_error(y_test, y_test_predict)),
+                    'mbe':
+                        et.mean_bias_error(y_test, y_test_predict),
+                    }
+                }
 
-g = sns.relplot(
-    data=target_total,
-    x='Day', y='ETa',
-    style='source', hue='source')
-plt.xticks(rotation=45)
+            scores[predictor] = pd.DataFrame(scores[predictor])
+            print("Predictor Scores")
+            print(scores[predictor])
 
-# !!! Falsa imputazione iterativa
-for i in range(ITERATIONS):
-    y = target_total['ETa'].dropna()
-    X = features.loc[y.index]
-    model.set_params(warm_start=False)
-
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.3, random_state=RANDOM_STATE
-    )
-    print("Predicting ETa")
-    for epoch in tqdm(range(EPOCHS)):
-        model.fit(X_train.values, y_train)
-
-    y_predicted = model.predict(X_test.values)
-    r2 = r2_score(y_test, y_predicted)
-    print(f'R2 Score: {r2:.4f}')
-
-# del model
+        k_scores[k][i] = scores
