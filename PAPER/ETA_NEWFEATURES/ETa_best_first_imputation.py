@@ -64,7 +64,8 @@ MLP_PARAMS = {
 RF_PARAMS = {
     'n_estimators': 100,
     'random_state': RANDOM_STATE,
-    'ccp_alpha': 0.5,
+    # Cost-Complexity Pruning: mettere il più piccolo possibile
+    'ccp_alpha': 0.015,
     }
 
 PREDICTORS = {
@@ -166,16 +167,19 @@ def plot_linear(x, y, **kwargs):
 
     models = get_linear_models()
     results = dict()
-    print("Linear Regressions:")
+    print_scores = kwargs.get('verbose') if 'verbose' in kwargs else False
+    if print_scores:
+        print("Linear Regressions:")
     for name, model in models.items():
         # evaluate the model
         results[name] = evalute_model(
             x[1].reshape(-1, 1), y[1].values.reshape(-1, 1),
             model, name)
-        # summarize progress
-        print(f'>{name} '
-              f'{np.mean(results[name]):.4} '
-              f'({np.std(results[name]):.4})')
+        if print_scores:
+            # summarize progress
+            print(f'>{name} '
+                  f'{np.mean(results[name]):.4} '
+                  f'({np.std(results[name]):.4})')
 
     models['RANSAC'].fit(x[1].reshape(-1, 1), y[1].values.reshape(-1, 1))
     x_linear = np.linspace(min(x[0]), max(x[0]), 100)
@@ -318,7 +322,7 @@ for k in range(KFOLDS):
             ys = [y_fit_predict, y_test_predict]
             plot_linear(xs, ys,
                         title=f"Model {i+1} k{k+1} - {predictor}")
-
+            y_test_predict.sort_index()
             if SAVE:
                 y_test_predict.to_csv(
                     f'{ROOT}/PAPER/RESULTS/'
