@@ -11,7 +11,6 @@ import copy
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from tqdm import tqdm
 import seaborn as sns
 
 from sklearn.linear_model import HuberRegressor
@@ -26,6 +25,52 @@ from sklearn.model_selection import RepeatedKFold
 from sklearn.metrics import mean_squared_error, r2_score
 
 import MODULES.et_functions as et
+
+
+ROOT = '../../'
+DATABASE = '../../CSV/db_villabate_deficit_6.csv'
+
+SAVE = True
+
+KFOLDS = 4
+
+EPOCHS = 1
+RANDOM_STATE = 12
+
+MODELS_FEATURES = [
+        ['Rs', 'U2', 'RHmin', 'RHmax', 'Tmin',
+         'Tmax', 'SWC', 'NDVI', 'NDWI', 'DOY'],  # 1
+        ['Rs', 'U2', 'RHmax', 'Tmin',
+         'Tmax', 'SWC', 'NDVI', 'NDWI', 'DOY'],  # 2
+        ['Rs', 'U2', 'RHmax', 'Tmax', 'SWC', 'NDVI', 'NDWI', 'DOY'],  # 3
+        ['Rs', 'U2', 'RHmax', 'Tmax', 'SWC', 'NDWI', 'DOY'],  # 4
+        ['Rs', 'U2', 'Tmax', 'SWC', 'NDWI', 'DOY'],   # 5
+        ['Rs', 'U2', 'Tmax', 'SWC', 'DOY'],  # 6
+        ['Rs', 'Tmax', 'SWC', 'DOY'],  # 7
+        ['Rs', 'RHmin', 'RHmax', 'Tmin', 'Tmax'],  # 8
+        ['ETo', 'SWC', 'NDVI', 'NDWI', 'DOY'],  # 9
+        ['ETo', 'NDVI', 'NDWI', 'DOY'],  # 10
+        ['Rs', 'Tmin', 'Tmax', 'DOY'],  # 11
+        ['Rs', 'Tavg', 'RHavg', 'DOY'],  # 12
+    ]
+
+MLP_PARAMS = {
+    'hidden_layer_sizes': (10, 10, 10),
+    'max_iter': 10000,
+    'random_state': RANDOM_STATE,
+    'warm_start': False,
+    }
+
+RF_PARAMS = {
+    'n_estimators': 100,
+    'random_state': RANDOM_STATE,
+    'ccp_alpha': 0.5,
+    }
+
+PREDICTORS = {
+    'mlp': MLPRegressor(**MLP_PARAMS),
+    'rf': RandomForestRegressor(**RF_PARAMS),
+    }
 
 
 def scale_sets(X_train, y_train, X_test, y_test):
@@ -47,18 +92,28 @@ def scale_sets(X_train, y_train, X_test, y_test):
     return X_train, y_train.ravel(), X_test, y_test.ravel()
 
 
+def rescale_sets(eta, *ys):
+    scaler = StandardScaler()
+    scaler.fit(eta.values.reshape(-1, 1))
+    ys_scaled = []
+    for y in ys:
+        y_scaled = scaler.inverse_transform(y.values.reshape(-1, 1))
+        y_scaled = pd.DataFrame(y_scaled, index=y.index, columns=y.columns)
+        ys_scaled.append(y_scaled)
+    return ys_scaled
+
+
 def get_linear_models():
     models = dict()
     models['Huber'] = HuberRegressor()
     models['RANSAC'] = RANSACRegressor()
     models['TheilSen'] = TheilSenRegressor()
-    # models['RANSAC'] = RANSACRegressor()
-    # models['TheilSen'] = TheilSenRegressor()
     return models
 
 
 # evaluate a model
 def evalute_model(X, y, model, name):
+    y = y.ravel()
     # define model evaluation method
     cv = RepeatedKFold(n_splits=10, n_repeats=3, random_state=1)
     # evaluate model
@@ -83,7 +138,8 @@ def plot_imputation(x, y, eta=None, **kwargs):
         et.plot_axis(ax, [eta.index, eta, 'blue', 0.2],
                      plot_type='scatter', legend='ETa Measured')
 
-    et.plot_axis(ax, [x[0], y[0], 'green'],
+    et.plot_axis(ax, [x[0], y[0], 'limegreen'],
+                 alpha=0.4,
                  plot_type='scatter', legend='ETa Test')
     et.plot_axis(ax, [x[1], y[1], 'red'],
                  plot_type='scatter', legend='ETa Prediction')
@@ -101,7 +157,8 @@ def plot_linear(x, y, **kwargs):
     et.plot_axis(ax, grid=True, title=title,
                  xlabel='ETa Measured', ylabel='ETa Predicted',)
     # Train
-    et.plot_axis(ax, [x[0], y[0], 'blue', 0.25],
+    et.plot_axis(ax, [x[0], y[0], 'blue'],
+                 alpha=0.1,
                  plot_type='scatter', legend='Fit Predictions')
     # Test
     et.plot_axis(ax, [x[1], y[1], 'red'],
@@ -109,12 +166,13 @@ def plot_linear(x, y, **kwargs):
 
     models = get_linear_models()
     results = dict()
+    print("Linear Regressions:")
     for name, model in models.items():
         # evaluate the model
         results[name] = evalute_model(
-            x[1].reshape(-1, 1), y[1].values.reshape(-1, 1), model, name)
+            x[1].reshape(-1, 1), y[1].values.reshape(-1, 1),
+            model, name)
         # summarize progress
-        print("Linear Regressions:")
         print(f'>{name} '
               f'{np.mean(results[name]):.4} '
               f'({np.std(results[name]):.4})')
@@ -123,6 +181,7 @@ def plot_linear(x, y, **kwargs):
     x_linear = np.linspace(min(x[0]), max(x[0]), 100)
     y_linear = models['RANSAC'].predict(x_linear.reshape(-1, 1))
     et.plot_axis(ax, [x_linear, y_linear, 'orange'],
+                 legend='Regression',
                  plot_type='line', alpha=1)
 
     ax.legend()
@@ -137,51 +196,6 @@ def plot_scores(scores):
     ax.text(0.5, scores[:, 0].max(), f'Max: {scores[:, 0].max():.4f}')
     plt.show()
 
-
-DATABASE = '../../CSV/db_villabate_deficit_6.csv'
-
-SAVE = False
-
-KFOLDS = 4
-
-EPOCHS = 1
-RANDOM_STATE = 58
-WARM_START = True
-ITERATIONS = 0
-
-MODELS_FEATURES = [
-        ['Rs', 'U2', 'RHmin', 'RHmax', 'Tmin',
-         'Tmax', 'SWC', 'NDVI', 'NDWI', 'DOY'],  # 1
-        ['Rs', 'U2', 'RHmax', 'Tmin',
-         'Tmax', 'SWC', 'NDVI', 'NDWI', 'DOY'],  # 2
-        ['Rs', 'U2', 'RHmax', 'Tmax', 'SWC', 'NDVI', 'NDWI', 'DOY'],  # 3
-        ['Rs', 'U2', 'RHmax', 'Tmax', 'SWC', 'NDWI', 'DOY'],  # 4
-        ['Rs', 'U2', 'Tmax', 'SWC', 'NDWI', 'DOY'],   # 5
-        ['Rs', 'U2', 'Tmax', 'SWC', 'DOY'],  # 6
-        ['Rs', 'Tmax', 'SWC', 'DOY'],  # 7
-        ['Rs', 'RHmin', 'RHmax', 'Tmin', 'Tmax'],  # 8
-        ['ETo', 'SWC', 'NDVI', 'NDWI', 'DOY'],  # 9
-        ['ETo', 'NDVI', 'NDWI', 'DOY'],  # 10
-        ['Rs', 'Tmin', 'Tmax', 'DOY'],  # 11
-        ['Rs', 'Tavg', 'RHavg', 'DOY'],  # 12
-    ]
-
-MLP_PARAMS = {
-    'hidden_layer_sizes': (10, 10, 10),
-    'max_iter': 10000,
-    'random_state': 12,
-    'warm_start': False,
-    }
-
-RF_PARAMS = {
-    'n_estimators': 100,
-    'random_state': 12,
-    }
-
-PREDICTORS = {
-    'mlp': MLPRegressor(**MLP_PARAMS),
-    'rf': RandomForestRegressor(**RF_PARAMS),
-    }
 
 eta = et.make_dataframe(
     DATABASE,
@@ -204,7 +218,7 @@ chunk = int(len(eta_idx)/KFOLDS)
 # MaiVisti uno di questi KFOLDS intervalli
 
 scores = {}
-k_scores = [[0 for i in range(len(MODELS_FEATURES))] for j in range(KFOLDS)]
+k_scores = [[0 for i in range(KFOLDS)] for j in range(len(MODELS_FEATURES))]
 
 # %% MAIN
 for k in range(KFOLDS):
@@ -290,4 +304,39 @@ for k in range(KFOLDS):
             print("Predictor Scores")
             print(scores[predictor])
 
-        k_scores[k][i] = scores
+            y_fit_predict, y_test_predict, target = rescale_sets(
+                eta, y_fit_predict, y_test_predict, target)
+
+            # Predictions plot
+            xs = [idx_train, idx_test]
+            ys = [y_fit_predict, y_test_predict]
+            plot_imputation(xs, ys, target,
+                            title=f"Model {i+1} k{k+1} - {predictor}")
+
+            # Linear plot
+            xs = [target.loc[idx_train].values, target.loc[idx_test].values]
+            ys = [y_fit_predict, y_test_predict]
+            plot_linear(xs, ys,
+                        title=f"Model {i+1} k{k+1} - {predictor}")
+
+            if SAVE:
+                y_test_predict.to_csv(
+                    f'{ROOT}/PAPER/RESULTS/'
+                    f'eta_predictions_m{i+1}_k{k+1}_{predictor}.csv',
+                    sep=';')
+
+        k_score = scores['mlp'].join(scores['rf'],
+                                     lsuffix='_mlp',
+                                     rsuffix='_rf')
+
+        k_scores[i][k] = k_score
+
+if SAVE:
+    for i in range(len(MODELS_FEATURES)):
+        m_scores = pd.concat(
+            [k_scores[i][k] for k in range(KFOLDS)],
+            axis=1,
+            keys=range(KFOLDS))
+        m_scores.to_csv(f'{ROOT}/PAPER/RESULTS/'
+                        f'eta_predictions_m{i+1}_scores.csv',
+                        sep=';')

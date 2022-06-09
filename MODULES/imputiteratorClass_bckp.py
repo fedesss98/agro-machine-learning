@@ -45,8 +45,8 @@ class ImputeIterator:
 
     mlp_params = {
         'hidden_layer_sizes': (50,100,100,50),
-        'activation': 'relu', # ‘identity’, ‘logistic’, ‘tanh’, ‘relu’
-        'solver': 'adam', # ‘lbfgs’, ‘sgd’, ‘adam’
+        'activation': 'relu',  # ‘identity’, ‘logistic’, ‘tanh’, ‘relu’
+        'solver': 'adam',  # ‘lbfgs’, ‘sgd’, ‘adam’
         'max_iter': 10000,
         'alpha': 0.1,
         'learning_rate': 'constant',
@@ -61,10 +61,10 @@ class ImputeIterator:
     train_fraction = 0.8
 
     # Array dei punteggi ottenuti durante le Iterazioni
-    score_t = [] # Punteggio del Test (step 1)
-    score_v = [] # Punteggio della Valutazione (step 2)
-    score_mv = [] # Punteggio su un set di Target mai visto (step 4)
-    measured_rateo = [] # Percentuale dei punti misurati nei Test
+    score_t = []  # Punteggio del Test (step 1)
+    score_v = []  # Punteggio della Valutazione (step 2)
+    score_mv = []  # Punteggio su un set di Target mai visto (step 4)
+    measured_rateo = []  # Percentuale dei punti misurati nei Test
     # Parametri di uscita
 
     def __init__(self, model=model,

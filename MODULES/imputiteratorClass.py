@@ -634,11 +634,12 @@ if __name__ == '__main__':
     import copy
 
     DATABASE = '../CSV/db_villabate_deficit_6.csv'
+    SAVE = True
 
-    ITER_LIMIT = 10
+    ITER_LIMIT = 1000
     INVALID_LIM = 10000
     MV_FRACTION = 0.2
-    FIT_FRACTION = 0.8
+    FIT_FRACTION8 = 0.8
 
     COLUMNS = [
         'Rs', 'U2', 'RHmin', 'RHmax',
@@ -660,7 +661,7 @@ if __name__ == '__main__':
         DATABASE,
         date_format='%Y-%m-%d',
         columns=['ETa'],
-        start='2019-01-01',
+        start='2018-01-01',
         method='drop',
         drop_index=True,
         )
@@ -680,7 +681,7 @@ if __name__ == '__main__':
     it = ImputeIterator(iter_limit=ITER_LIMIT,
                         inv_series_lim=INVALID_LIM,
                         verbose=True,
-                        output_freq=1)
+                        output_freq=20)
     it.fit(features, eta)
     # Gli indici dei dati MaiVisti vengono inseriti nell'Imputatore
     imputed = it.impute(eta,
@@ -689,6 +690,34 @@ if __name__ == '__main__':
     # Indici delle misure viste (usate per l'imputazione)
     idx_fix = [idx for idx in imputed.index if idx in eta.index]
     idx_free = [idx for idx in imputed.index if idx not in eta.index]
+
+    scores = np.array(it.score_mv)
+    scores[:, 1] = np.sqrt(scores[:, 1])
+    # Score for the internal test
+    internal_score = np.append(np.array(it.score_t),
+                               np.array(it.measured_rateo).reshape(-1, 1),
+                               axis=1)
+    # Sostituisce la radice del MSE al MSE
+    internal_score[:, 1] = np.sqrt(internal_score[:, 1])
+    # Punteggi di test
+    fit_score = np.array(it.score_fit)
+    # Sostituisce la radice del MSE al MSE
+    fit_score[:, 1] = np.sqrt(fit_score[:, 1])
+
+    # Si uniscono questi punteggi a quelli del test MaiVisti
+    scores = np.append(scores, fit_score, axis=1)
+    scores = np.append(scores, internal_score, axis=1)
+    # E si crea un DataFrame
+    scores = pd.DataFrame(
+        scores,
+        columns=['R2mv', 'RMSEmv', 'MBEmv',
+                 'R2fit', 'RMSEfit',
+                 'R2t', 'RMSEt', 'MBEt', 'Rateo']
+        )
+    if SAVE:
+        scores.to_csv(f'../PAPER/PLOTS/ITERATIVEIMPUTER/SCORES_MV/SAME_FIT/'
+                      f'scoresmv_{ITER_LIMIT}_model1.csv',
+                      sep=';',)
 
     # %% PLOTS
     # Si crea una colonna di etichette per i dati di ETa

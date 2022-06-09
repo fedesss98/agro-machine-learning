@@ -52,7 +52,7 @@ def plot_scores(scores):
     plt.show()
 
 
-DATABASE = '../../CSV/db_villabate_deficit_3.csv'
+DATABASE = '../../CSV/db_villabate_deficit_6.csv'
 EPOCHS = 1
 RANDOM_STATE = 58  # 58
 WARM_START = False

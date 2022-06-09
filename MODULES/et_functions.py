@@ -179,7 +179,7 @@ def plot_axis(ax, *axis, plot_type='line', **kwargs):
         if plot_type == 'scatter':
             plot = ax.scatter(x, y, alpha=alpha, c=color, s=size)
         elif plot_type == 'line':
-            plot = ax.plot(x, y, alpha=alpha, c=color)
+            plot, = ax.plot(x, y, alpha=alpha, c=color)
     if 'grid' in kwargs:
         if kwargs.get('grid'):
             ax.grid()
