@@ -19,6 +19,8 @@ from sklearn.linear_model import TheilSenRegressor
 from sklearn.preprocessing import StandardScaler
 from sklearn.neural_network import MLPRegressor
 from sklearn.ensemble import RandomForestRegressor
+from sklearn.tree import DecisionTreeRegressor
+
 
 from sklearn.model_selection import cross_val_score
 from sklearn.model_selection import RepeatedKFold
@@ -31,6 +33,7 @@ ROOT = '../../'
 DATABASE = '../../CSV/db_villabate_deficit_6.csv'
 
 SAVE = True
+PLOTS = 'rescaled'  # scaled / rescaled / None
 
 KFOLDS = 4
 
@@ -65,7 +68,7 @@ RF_PARAMS = {
     'n_estimators': 100,
     'random_state': RANDOM_STATE,
     # Cost-Complexity Pruning: mettere il più piccolo possibile
-    'ccp_alpha': 0.015,
+    'ccp_alpha': 0.0,
     }
 
 PREDICTORS = {
@@ -273,17 +276,24 @@ for k in range(KFOLDS):
                 index=idx_test,
                 )
 
-            # Predictions plot
-            xs = [idx_train, idx_test]
-            ys = [y_fit_predict, y_test_predict]
-            plot_imputation(xs, ys, target,
+            if PLOTS == 'scaled':
+                # Predictions plot
+                xs = [idx_train, idx_test]
+                ys = [y_fit_predict, y_test_predict]
+                plot_imputation(xs, ys, target,
+                                title=f"Model {i+1} k{k+1} - {predictor}")
+
+                # Linear plot
+                xs = [y_train, y_test]
+                ys = [y_fit_predict, y_test_predict]
+                plot_linear(xs, ys,
                             title=f"Model {i+1} k{k+1} - {predictor}")
 
-            # Linear plot
-            xs = [y_train, y_test]
-            ys = [y_fit_predict, y_test_predict]
-            plot_linear(xs, ys,
-                        title=f"Model {i+1} k{k+1} - {predictor}")
+            if SAVE:
+                y_test_predict.to_csv(
+                    f'{ROOT}/PAPER/RESULTS/'
+                    f'eta_predictions_m{i+1}_k{k+1}_{predictor}_scaled.csv',
+                    sep=';')
 
             scores[predictor] = {
                 'train': {
@@ -308,20 +318,22 @@ for k in range(KFOLDS):
             print("Predictor Scores")
             print(scores[predictor])
 
+            # Rescale sets
             y_fit_predict, y_test_predict, target = rescale_sets(
                 eta, y_fit_predict, y_test_predict, target)
 
-            # Predictions plot
-            xs = [idx_train, idx_test]
-            ys = [y_fit_predict, y_test_predict]
-            plot_imputation(xs, ys, target,
-                            title=f"Model {i+1} k{k+1} - {predictor}")
+            if PLOTS == 'rescaled':
+                # Predictions plot
+                xs = [idx_train, idx_test]
+                ys = [y_fit_predict, y_test_predict]
+                plot_imputation(xs, ys, target,
+                                title=f"Model {i+1} k{k+1} - {predictor}")
 
-            # Linear plot
-            xs = [target.loc[idx_train].values, target.loc[idx_test].values]
-            ys = [y_fit_predict, y_test_predict]
-            plot_linear(xs, ys,
-                        title=f"Model {i+1} k{k+1} - {predictor}")
+                # Linear plot
+                xs = [target.loc[idx_train].values, target.loc[idx_test].values]
+                ys = [y_fit_predict, y_test_predict]
+                plot_linear(xs, ys,
+                            title=f"Model {i+1} k{k+1} - {predictor}")
             y_test_predict.sort_index()
             if SAVE:
                 y_test_predict.to_csv(

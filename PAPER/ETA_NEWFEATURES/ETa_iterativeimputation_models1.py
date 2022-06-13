@@ -27,8 +27,8 @@ SAVE = True
 
 KFOLDS = 4
 
-ITER_LIMIT = 3
-INVALID_LIM = 10000
+ITER_LIMIT = 2
+INVALID_LIM = 1000
 
 MODELS_FEATURES = [
         ['Rs', 'U2', 'RHmin', 'RHmax', 'Tmin',
