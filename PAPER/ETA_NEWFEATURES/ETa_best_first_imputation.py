@@ -50,7 +50,7 @@ MODELS_FEATURES = [
         ['Rs', 'U2', 'RHmin', 'RHmax', 'Tmin',
          'Tmax', 'SWC', 'NDVI', 'NDWI', 'DOY'],  # 1
         ['Rs', 'U2', 'RHmax', 'Tmin',
-         'Tmax', 'SWC', 'NDVI', 'NDWI', 'DOY'],  # 2
+          'Tmax', 'SWC', 'NDVI', 'NDWI', 'DOY'],  # 2
         ['Rs', 'U2', 'RHmax', 'Tmax', 'SWC', 'NDVI', 'NDWI', 'DOY'],  # 3
         ['Rs', 'U2', 'RHmax', 'Tmax', 'SWC', 'NDWI', 'DOY'],  # 4
         ['Rs', 'U2', 'Tmax', 'SWC', 'NDWI', 'DOY'],   # 5
@@ -210,6 +210,28 @@ def plot_scores(scores):
     plt.show()
 
 
+def make_scores(train, test):
+    scores_dict = {
+        'train': {
+            'r2':
+                r2_score(train[0], train[1]),
+            'rmse':
+                np.sqrt(train[0], train[1]),
+            'mbe':
+                et.mean_bias_error(train[0], train[1]),
+            },
+        'test': {
+            'r2':
+                r2_score(test[0], test[1]),
+            'rmse':
+                np.sqrt(mean_squared_error(test[0], test[1])),
+            'mbe':
+                et.mean_bias_error(test[0], test[1]),
+            }
+        }
+    return pd.DataFrame(scores_dict)
+
+
 eta = et.make_dataframe(
     DATABASE,
     columns='ETa',
@@ -306,55 +328,28 @@ for k in range(KFOLDS):
                     f'eta_predictions_m{i+1}_k{k+1}_{predictor}_scaled.csv',
                     sep=';')
 
-            scores_scld[predictor] = {
-                'train': {
-                    'r2':
-                        r2_score(y_train, y_fit_predict),
-                    'rmse':
-                        np.sqrt(mean_squared_error(y_train, y_fit_predict)),
-                    'mbe':
-                        et.mean_bias_error(y_train, y_fit_predict),
-                    },
-                'test': {
-                    'r2':
-                        r2_score(y_test, y_test_predict),
-                    'rmse':
-                        np.sqrt(mean_squared_error(y_test, y_test_predict)),
-                    'mbe':
-                        et.mean_bias_error(y_test, y_test_predict),
-                    }
-                }
-
-            scores_scld[predictor] = pd.DataFrame(scores_scld[predictor])
+            scores_scld[predictor] = make_scores([y_train, y_fit_predict],
+                                                 [y_test, y_test_predict],)
             print("Predictor Scores")
             print(scores_scld[predictor])
 
             # Rescale sets
             y_fit_predict, y_test_predict, target = rescale_sets(
                 eta, y_fit_predict, y_test_predict, target)
+
+            if SAVE:
+                # Save predictions (on test set)
+                y_test_predict.to_csv(
+                    f'{ROOT}/PAPER/RESULTS/PREDICTIONS/'
+                    f'eta_predictions_m{i+1}_k{k+1}_{predictor}.csv',
+                    sep=';')
+
             # Retake original test and training set (unscaled)
             y_train = eta.loc[idx_train]
             y_test = eta.loc[idx_test]
 
-            scores[predictor] = {
-                'train': {
-                    'r2':
-                        r2_score(y_train, y_fit_predict),
-                    'rmse':
-                        np.sqrt(mean_squared_error(y_train, y_fit_predict)),
-                    'mbe':
-                        et.mean_bias_error(y_train, y_fit_predict),
-                    },
-                'test': {
-                    'r2':
-                        r2_score(y_test, y_test_predict),
-                    'rmse':
-                        np.sqrt(mean_squared_error(y_test, y_test_predict)),
-                    'mbe':
-                        et.mean_bias_error(y_test, y_test_predict),
-                    }
-                }
-            scores[predictor] = pd.DataFrame(scores[predictor])
+            scores[predictor] = make_scores([y_train, y_fit_predict],
+                                            [y_test, y_test_predict],)
 
             if PLOTS == 'rescaled' or PLOTS == 'all':
                 # Predictions plot
@@ -369,13 +364,6 @@ for k in range(KFOLDS):
                 ys = [y_fit_predict, y_test_predict]
                 plot_linear(xs, ys,
                             title=f"Model {i+1} k{k+1} - {predictor}")
-
-            if SAVE:
-                # Save predictions (on test set)
-                y_test_predict.to_csv(
-                    f'{ROOT}/PAPER/RESULTS/PREDICTIONS/'
-                    f'eta_predictions_m{i+1}_k{k+1}_{predictor}.csv',
-                    sep=';')
 
         k_score = scores_scld['mlp'].join(scores_scld['rf'],
                                           lsuffix='_mlp',
