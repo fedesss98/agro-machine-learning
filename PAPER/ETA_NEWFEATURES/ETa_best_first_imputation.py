@@ -6,6 +6,12 @@ Created on Thu Mar 17 09:18:50 2022
 @author: Federico Amato
 Modelli classici di ML applicati al dataset di ETa,
 con diverse features in ingresso.
+In base al valore di PLOTS stampa o meno i grafici delle predizioni per i dati
+scalati o quelli riscalati.
+In base al valore di SAVE esporta il csv con i punteggi di test e train sui
+dati scalati (con suffisso _scaled) e riscalati.
+
+Stampa i punteggi dei dati scalati
 """
 import copy
 import matplotlib.pyplot as plt
@@ -33,7 +39,7 @@ ROOT = '../../'
 DATABASE = '../../CSV/db_villabate_deficit_6.csv'
 
 SAVE = True
-PLOTS = 'rescaled'  # scaled / rescaled / None
+PLOTS = 'rescaled'  # scaled / rescaled / all / None
 
 KFOLDS = 4
 
@@ -224,8 +230,12 @@ chunk = int(len(eta_idx)/KFOLDS)
 # Si esegue il programma prendendo di volta in volta come indici (date) dei
 # MaiVisti uno di questi KFOLDS intervalli
 
+scores_scld = {}
 scores = {}
-k_scores = [[0 for i in range(KFOLDS)] for j in range(len(MODELS_FEATURES))]
+k_scores_scld = [[0 for i in range(KFOLDS)]
+                 for j in range(len(MODELS_FEATURES))]
+k_scores = [[0 for i in range(KFOLDS)]
+            for j in range(len(MODELS_FEATURES))]
 
 # %% MAIN
 for k in range(KFOLDS):
@@ -275,8 +285,9 @@ for k in range(KFOLDS):
                 columns=['ETa'],
                 index=idx_test,
                 )
+            y_test_predict.sort_index()
 
-            if PLOTS == 'scaled':
+            if PLOTS == 'scaled' or PLOTS == 'all':
                 # Predictions plot
                 xs = [idx_train, idx_test]
                 ys = [y_fit_predict, y_test_predict]
@@ -291,9 +302,39 @@ for k in range(KFOLDS):
 
             if SAVE:
                 y_test_predict.to_csv(
-                    f'{ROOT}/PAPER/RESULTS/'
+                    f'{ROOT}/PAPER/RESULTS/PREDICTIONS/'
                     f'eta_predictions_m{i+1}_k{k+1}_{predictor}_scaled.csv',
                     sep=';')
+
+            scores_scld[predictor] = {
+                'train': {
+                    'r2':
+                        r2_score(y_train, y_fit_predict),
+                    'rmse':
+                        np.sqrt(mean_squared_error(y_train, y_fit_predict)),
+                    'mbe':
+                        et.mean_bias_error(y_train, y_fit_predict),
+                    },
+                'test': {
+                    'r2':
+                        r2_score(y_test, y_test_predict),
+                    'rmse':
+                        np.sqrt(mean_squared_error(y_test, y_test_predict)),
+                    'mbe':
+                        et.mean_bias_error(y_test, y_test_predict),
+                    }
+                }
+
+            scores_scld[predictor] = pd.DataFrame(scores_scld[predictor])
+            print("Predictor Scores")
+            print(scores_scld[predictor])
+
+            # Rescale sets
+            y_fit_predict, y_test_predict, target = rescale_sets(
+                eta, y_fit_predict, y_test_predict, target)
+            # Retake original test and training set (unscaled)
+            y_train = eta.loc[idx_train]
+            y_test = eta.loc[idx_test]
 
             scores[predictor] = {
                 'train': {
@@ -313,16 +354,9 @@ for k in range(KFOLDS):
                         et.mean_bias_error(y_test, y_test_predict),
                     }
                 }
-
             scores[predictor] = pd.DataFrame(scores[predictor])
-            print("Predictor Scores")
-            print(scores[predictor])
 
-            # Rescale sets
-            y_fit_predict, y_test_predict, target = rescale_sets(
-                eta, y_fit_predict, y_test_predict, target)
-
-            if PLOTS == 'rescaled':
+            if PLOTS == 'rescaled' or PLOTS == 'all':
                 # Predictions plot
                 xs = [idx_train, idx_test]
                 ys = [y_fit_predict, y_test_predict]
@@ -330,18 +364,26 @@ for k in range(KFOLDS):
                                 title=f"Model {i+1} k{k+1} - {predictor}")
 
                 # Linear plot
-                xs = [target.loc[idx_train].values, target.loc[idx_test].values]
+                xs = [eta.loc[idx_train].values,
+                      eta.loc[idx_test].values]
                 ys = [y_fit_predict, y_test_predict]
                 plot_linear(xs, ys,
                             title=f"Model {i+1} k{k+1} - {predictor}")
-            y_test_predict.sort_index()
+
             if SAVE:
+                # Save predictions (on test set)
                 y_test_predict.to_csv(
-                    f'{ROOT}/PAPER/RESULTS/'
+                    f'{ROOT}/PAPER/RESULTS/PREDICTIONS/'
                     f'eta_predictions_m{i+1}_k{k+1}_{predictor}.csv',
                     sep=';')
 
-        k_score = scores['mlp'].join(scores['rf'],
+        k_score = scores_scld['mlp'].join(scores_scld['rf'],
+                                          lsuffix='_mlp',
+                                          rsuffix='_rf')
+
+        k_scores_scld[i][k] = k_score
+
+        k_score = scores['mlp'].join(scores_scld['rf'],
                                      lsuffix='_mlp',
                                      rsuffix='_rf')
 
@@ -349,10 +391,17 @@ for k in range(KFOLDS):
 
 if SAVE:
     for i in range(len(MODELS_FEATURES)):
+        m_scores_scld = pd.concat(
+            [k_scores_scld[i][k] for k in range(KFOLDS)],
+            axis=1,
+            keys=range(KFOLDS))
+        m_scores_scld.to_csv(f'{ROOT}/PAPER/RESULTS/SCORES/'
+                             f'eta_predictions_m{i+1}_scores_scaled.csv',
+                             sep=';')
         m_scores = pd.concat(
             [k_scores[i][k] for k in range(KFOLDS)],
             axis=1,
             keys=range(KFOLDS))
-        m_scores.to_csv(f'{ROOT}/PAPER/RESULTS/'
+        m_scores.to_csv(f'{ROOT}/PAPER/RESULTS/SCORES/'
                         f'eta_predictions_m{i+1}_scores.csv',
                         sep=';')
