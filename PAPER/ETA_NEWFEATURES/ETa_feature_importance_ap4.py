@@ -14,6 +14,8 @@ from sklearn.neural_network import MLPRegressor
 from sklearn.datasets import make_regression
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import GradientBoostingRegressor
+from sklearn.inspection import permutation_importance
+from sklearn.neighbors import KNeighborsRegressor
 
 import seaborn as sns
 
@@ -45,7 +47,7 @@ def plot_scattermatrix(df):
     # plt.savefig('Images/scatter_matrix.eps') 
     plt.show()
     
-database = '../../CSV/db_villabate_deficit_5.csv'
+database = '../../CSV/db_villabate_deficit_6.csv'
 # database_es = '../../CSV/tensione_vapore_saturo.csv'
 # database_ndvi = '../../NDVI/deficit_ndvi.csv'
 # database_ndwi = '../../NDVI/deficit_NDWI.csv'
@@ -57,7 +59,7 @@ dataframe_par = {
         'RHmax',
         'Tmin',
         'Tmax',
-        # 'ETo',
+          # 'ETo',
         # 'SWC',
         'NDVI',
         'NDWI',
@@ -110,11 +112,12 @@ df_total = df.join([mean_SWC,df_eta], how='inner')
 df_total.insert(0, 'DOY', df_total.index.dayofyear)
 # df_total.insert(0, 'week', df_total.index.week)
 #%% FEATURE IMPORTANCE
-model = GradientBoostingRegressor(random_state=0)
+model = KNeighborsRegressor()
 X = df_total.dropna().iloc[:,0:-1]
 y = df_total.dropna().iloc[:,-1]
 model.fit(X,y)
-importances = model.feature_importances_
+results = permutation_importance(model, X, y)
+importances = results.importances_mean
 features = df_total.iloc[:,:-1].columns
 df_fi = pd.Series(importances, index=features,name='Importance').sort_values(ascending=False)
 print(f'{"Feature":{8}} -  Importance Score\n____________________________')

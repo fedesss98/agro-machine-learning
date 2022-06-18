@@ -47,7 +47,7 @@ MODELS = {
     'Linear Regressor': LinearRegression(),
     'Support Vector Machine': SVR(),
     }
-DATABASE = '../../CSV/db_villabate_deficit_2.csv'
+DATABASE = '../../CSV/db_villabate_deficit_6.csv'
 DATAFRAME_PAR = {
     'columns': [
         'θ 10',
@@ -56,13 +56,13 @@ DATAFRAME_PAR = {
         'θ 40',
         'θ 50',
         'θ 60',
-        'U 2m',
-        'Rshw dwn',
+        'U2',
+        'Rs',
         'RHmin',
         'RHmax',
         'Tmin',
         'Tmax',
-        'ET0',
+        'ETo',
         'ETa',
         ],
     'start': '2018-01-01',
@@ -124,8 +124,9 @@ MODELS[bestR2[1]].fit(X,y)
 eta_predicted = MODELS[bestR2[1]].predict(X_total)
 
 # Da ETa e ET0 si ricava K, sia predetto che misurato
-k_total = eta_predicted / df['ET0']
-k_measured = df_measured['ETa'] / df_measured['ET0']
+k_total = eta_predicted / df['ETo']
+k_total.plot()
+k_measured = df_measured['ETa'] / df_measured['ETo']
 
 # Si cercano degli Outliers nel K predetto, fittando sul K misurato
 

@@ -39,7 +39,7 @@ ROOT = '../../'
 DATABASE = '../../CSV/db_villabate_deficit_6.csv'
 
 SAVE = True
-PLOTS = 'rescaled'  # scaled / rescaled / all / None
+PLOTS = 'all'  # scaled / rescaled / all / None
 
 KFOLDS = 4
 
@@ -50,13 +50,13 @@ MODELS_FEATURES = [
         ['Rs', 'U2', 'RHmin', 'RHmax', 'Tmin',
          'Tmax', 'SWC', 'NDVI', 'NDWI', 'DOY'],  # 1
         ['Rs', 'U2', 'RHmax', 'Tmin',
-          'Tmax', 'SWC', 'NDVI', 'NDWI', 'DOY'],  # 2
+         'Tmax', 'SWC', 'NDVI', 'NDWI', 'DOY'],  # 2
         ['Rs', 'U2', 'RHmax', 'Tmax', 'SWC', 'NDVI', 'NDWI', 'DOY'],  # 3
         ['Rs', 'U2', 'RHmax', 'Tmax', 'SWC', 'NDWI', 'DOY'],  # 4
         ['Rs', 'U2', 'Tmax', 'SWC', 'NDWI', 'DOY'],   # 5
         ['Rs', 'U2', 'Tmax', 'SWC', 'DOY'],  # 6
         ['Rs', 'Tmax', 'SWC', 'DOY'],  # 7
-        ['Rs', 'RHmin', 'RHmax', 'Tmin', 'Tmax'],  # 8
+        ['Rs','RHmin', 'RHmax', 'Tmin', 'Tmax'],  # 8
         ['ETo', 'SWC', 'NDVI', 'NDWI', 'DOY'],  # 9
         ['ETo', 'NDVI', 'NDWI', 'DOY'],  # 10
         ['Rs', 'Tmin', 'Tmax', 'DOY'],  # 11
@@ -81,6 +81,32 @@ PREDICTORS = {
     'mlp': MLPRegressor(**MLP_PARAMS),
     'rf': RandomForestRegressor(**RF_PARAMS),
     }
+
+# %% FUNCTIONS
+
+
+def get_eta():
+    eta = et.make_dataframe(
+        DATABASE,
+        columns='ETa',
+        start='2018-01-01',
+        method='drop',
+        drop_index=True,
+        )
+    return eta
+
+
+def get_features(columns):
+    fts = et.make_dataframe(
+        DATABASE,
+        date_format='%Y-%m-%d',
+        columns=columns,
+        start='2018-01-01',
+        method='impute',
+        nn=5,
+        drop_index=True,
+        )
+    return fts
 
 
 def scale_sets(X_train, y_train, X_test, y_test):
@@ -151,8 +177,14 @@ def plot_imputation(x, y, eta=None, **kwargs):
     et.plot_axis(ax, [x[0], y[0], 'limegreen'],
                  alpha=0.4,
                  plot_type='scatter', legend='ETa Test')
+    # x = np.append(x[1], x[2])
+    # y = np.append(y[1], y[2])
     et.plot_axis(ax, [x[1], y[1], 'red'],
                  plot_type='scatter', legend='ETa Prediction')
+    # Total Prediction
+    if len(x) > 2:
+        et.plot_axis(ax, [x[2], y[2], 'orange'],
+                     plot_type='scatter', legend='ETa Prediction')
     ax.legend()
     plt.show()
 
@@ -201,22 +233,13 @@ def plot_linear(x, y, **kwargs):
     plt.show()
 
 
-def plot_scores(scores):
-    fig, ax = plt.figure()
-    ax.plot(np.arange(EPOCHS+1), scores[:, 0], c='blue', alpha=0.4)
-    ax.plot(np.arange(EPOCHS+1), scores[:, 0], c='green', alpha=0.4)
-    ax.hlines(scores[:, 0].max(), 0, EPOCHS+1, ls='--', color='red')
-    ax.text(0.5, scores[:, 0].max(), f'Max: {scores[:, 0].max():.4f}')
-    plt.show()
-
-
 def make_scores(train, test):
     scores_dict = {
         'train': {
             'r2':
                 r2_score(train[0], train[1]),
             'rmse':
-                np.sqrt(train[0], train[1]),
+                np.sqrt(mean_squared_error(train[0], train[1])),
             'mbe':
                 et.mean_bias_error(train[0], train[1]),
             },
@@ -232,14 +255,7 @@ def make_scores(train, test):
     return pd.DataFrame(scores_dict)
 
 
-eta = et.make_dataframe(
-    DATABASE,
-    columns='ETa',
-    start='2018-01-01',
-    method='drop',
-    drop_index=True,
-    )
-
+eta = get_eta()
 # %% CROSS-VALIDATION
 # Si prendono gli indici (date) di ETa
 eta_idx = copy.deepcopy(eta.index.values)
@@ -265,15 +281,7 @@ for k in range(KFOLDS):
     idx_train = [idx for idx in eta_idx if idx not in idx_test]
 
     for i, columns in enumerate(MODELS_FEATURES):
-        features = et.make_dataframe(
-            DATABASE,
-            date_format='%Y-%m-%d',
-            columns=columns,
-            start='2018-01-01',
-            method='impute',
-            nn=5,
-            drop_index=True,
-            )
+        features = get_features(columns)
 
         target = eta.copy()
 
@@ -281,17 +289,23 @@ for k in range(KFOLDS):
             print(f'\n{"***":<5} MODEL {i+1} '
                   f'// k{k+1} '
                   f'// {predictor} {"***":>5}')
+            idx_predict = [idx for idx in features.index
+                           if idx not in idx_train]
             model = PREDICTORS[predictor]
 
             X_train = features.loc[idx_train]
             y_train = target.loc[idx_train]
             X_test = features.loc[idx_test]
             y_test = target.loc[idx_test]
+            X_predict = features.loc[idx_predict]
 
-            # Rescaling dei dati
+            pred_scale = StandardScaler().fit(X_train)
+
+            # Scaling dei dati
             X_train, y_train, X_test, y_test = scale_sets(
                 X_train, y_train, X_test, y_test)
-            # Rescaling delle misure
+            X_predict = pred_scale.transform(X_predict)
+            # Scaling delle misure
             target = StandardScaler().fit_transform(
                 target.values.reshape(-1, 1))
             target = pd.DataFrame(target, index=np.sort(eta_idx))
@@ -308,11 +322,15 @@ for k in range(KFOLDS):
                 index=idx_test,
                 )
             y_test_predict.sort_index()
-
+            y_predict = pd.DataFrame(
+                model.predict(X_predict),
+                columns=['ETa'],
+                index=idx_predict,
+                )
             if PLOTS == 'scaled' or PLOTS == 'all':
                 # Predictions plot
-                xs = [idx_train, idx_test]
-                ys = [y_fit_predict, y_test_predict]
+                xs = [idx_train, idx_test, idx_predict]
+                ys = [y_fit_predict, y_test_predict, y_predict]
                 plot_imputation(xs, ys, target,
                                 title=f"Model {i+1} k{k+1} - {predictor}")
 
@@ -334,8 +352,8 @@ for k in range(KFOLDS):
             print(scores_scld[predictor])
 
             # Rescale sets
-            y_fit_predict, y_test_predict, target = rescale_sets(
-                eta, y_fit_predict, y_test_predict, target)
+            y_fit_predict, y_test_predict, y_predict, target = rescale_sets(
+                eta, y_fit_predict, y_test_predict, y_predict, target)
 
             if SAVE:
                 # Save predictions (on test set)
@@ -343,6 +361,11 @@ for k in range(KFOLDS):
                     f'{ROOT}/PAPER/RESULTS/PREDICTIONS/'
                     f'eta_predictions_m{i+1}_k{k+1}_{predictor}.csv',
                     sep=';')
+                y_predict.to_csv(
+                    f'{ROOT}/PAPER/RESULTS/PREDICTIONS/'
+                    f'eta_total_predictions_m{i+1}_k{k+1}_{predictor}.csv',
+                    sep=';'
+                    )
 
             # Retake original test and training set (unscaled)
             y_train = eta.loc[idx_train]
@@ -353,8 +376,8 @@ for k in range(KFOLDS):
 
             if PLOTS == 'rescaled' or PLOTS == 'all':
                 # Predictions plot
-                xs = [idx_train, idx_test]
-                ys = [y_fit_predict, y_test_predict]
+                xs = [idx_train, idx_test, idx_predict]
+                ys = [y_fit_predict, y_test_predict, y_predict]
                 plot_imputation(xs, ys, target,
                                 title=f"Model {i+1} k{k+1} - {predictor}")
 
