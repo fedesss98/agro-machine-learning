@@ -64,7 +64,7 @@ MLP_PARAMS = {
     }
 
 RF_PARAMS = {
-    'n_estimators': 100,
+    'n_estimators': 1000,
     'random_state': RANDOM_STATE,
     # Cost-Complexity Pruning: mettere il più piccolo possibile
     'ccp_alpha': 0.000,
@@ -118,7 +118,7 @@ def get_linear_models():
 def evalute_model(X, y, model, name):
     y = y.ravel()
     # define model evaluation method
-    cv = RepeatedKFold(n_splits=10, n_repeats=3, random_state=1)
+    cv = RepeatedKFold(n_splits=4, n_repeats=3, random_state=1)
     # evaluate model
     scores = cross_val_score(
         model, X, y, scoring='neg_mean_absolute_error', cv=cv, n_jobs=-1)

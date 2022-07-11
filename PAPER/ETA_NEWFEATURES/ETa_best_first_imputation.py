@@ -40,32 +40,38 @@ DATABASE = '../../CSV/db_villabate_deficit_6.csv'
 
 SAVE = True
 PLOTS = 'all'  # scaled / rescaled / all / None
+VERBOSE = True
 
 KFOLDS = 4
 
 EPOCHS = 1
 RANDOM_STATE = 12
+SHUFFLE_SEED = 6475  # 6475, 325, 2190, 27574, 19803
 
 MODELS_FEATURES = [
         ['Rs', 'U2', 'RHmin', 'RHmax', 'Tmin',
          'Tmax', 'SWC', 'NDVI', 'NDWI', 'DOY'],  # 1
         ['Rs', 'U2', 'RHmax', 'Tmin',
-         'Tmax', 'SWC', 'NDVI', 'NDWI', 'DOY'],  # 2
+          'Tmax', 'SWC', 'NDVI', 'NDWI', 'DOY'],  # 2
         ['Rs', 'U2', 'RHmax', 'Tmax', 'SWC', 'NDVI', 'NDWI', 'DOY'],  # 3
         ['Rs', 'U2', 'RHmax', 'Tmax', 'SWC', 'NDWI', 'DOY'],  # 4
         ['Rs', 'U2', 'Tmax', 'SWC', 'NDWI', 'DOY'],   # 5
         ['Rs', 'U2', 'Tmax', 'SWC', 'DOY'],  # 6
         ['Rs', 'Tmax', 'SWC', 'DOY'],  # 7
-        ['Rs','RHmin', 'RHmax', 'Tmin', 'Tmax'],  # 8
+        ['Rs', 'RHmin', 'RHmax', 'Tmin', 'Tmax'],  # 8
         ['ETo', 'SWC', 'NDVI', 'NDWI', 'DOY'],  # 9
         ['ETo', 'NDVI', 'NDWI', 'DOY'],  # 10
-        ['Rs', 'Tmin', 'Tmax', 'DOY'],  # 11
-        ['Rs', 'Tavg', 'RHavg', 'DOY'],  # 12
+        ['Rs', 'SWC', 'NDVI', 'NDWI', 'DOY'],  # 11
+        ['Rs', 'NDVI', 'NDWI', 'DOY'],  # 12
     ]
 
 MLP_PARAMS = {
     'hidden_layer_sizes': (10, 10, 10),
     'max_iter': 10000,
+    "activation": "relu",
+    "solver": "adam",
+    "alpha": 0.0001,
+    "learning_rate": "constant",
     'random_state': RANDOM_STATE,
     'warm_start': False,
     }
@@ -90,6 +96,7 @@ def get_eta():
         DATABASE,
         columns='ETa',
         start='2018-01-01',
+        end='2021-11-30', # 2021-07-01
         method='drop',
         drop_index=True,
         )
@@ -102,6 +109,7 @@ def get_features(columns):
         date_format='%Y-%m-%d',
         columns=columns,
         start='2018-01-01',
+        end='2021-11-30', # 2021-07-01
         method='impute',
         nn=5,
         drop_index=True,
@@ -260,7 +268,7 @@ eta = get_eta()
 # Si prendono gli indici (date) di ETa
 eta_idx = copy.deepcopy(eta.index.values)
 # e si mescolano in modo random
-RNG = np.random.default_rng(seed=6475)
+RNG = np.random.default_rng(seed=SHUFFLE_SEED)  # !!!
 RNG.shuffle(eta_idx)
 # Il set di ETa viene diviso in KFOLDS intervalli
 # ogni intervallo è lungo 1/KFOLDS della lunghezza totale
@@ -279,7 +287,12 @@ k_scores = [[0 for i in range(KFOLDS)]
 for k in range(KFOLDS):
     idx_test = eta_idx[k*chunk: (k+1)*chunk]
     idx_train = [idx for idx in eta_idx if idx not in idx_test]
-
+    idx_test.sort()
+    idx_train.sort()
+    # y_idx = np.sort(idx_test)
+    # plt.plot(y_idx)
+    # plt.title(f"Index of Test data ({len(idx_test)}) for k {k+1}")
+    # plt.show()
     for i, columns in enumerate(MODELS_FEATURES):
         features = get_features(columns)
 
@@ -293,11 +306,11 @@ for k in range(KFOLDS):
                            if idx not in idx_train]
             model = PREDICTORS[predictor]
 
-            X_train = features.loc[idx_train]
-            y_train = target.loc[idx_train]
-            X_test = features.loc[idx_test]
-            y_test = target.loc[idx_test]
-            X_predict = features.loc[idx_predict]
+            X_train = features.loc[idx_train].sort_index()
+            y_train = target.loc[idx_train].sort_index()
+            X_test = features.loc[idx_test].sort_index()
+            y_test = target.loc[idx_test].sort_index()
+            X_predict = features.loc[idx_predict].sort_index()
 
             pred_scale = StandardScaler().fit(X_train)
 
@@ -305,6 +318,7 @@ for k in range(KFOLDS):
             X_train, y_train, X_test, y_test = scale_sets(
                 X_train, y_train, X_test, y_test)
             X_predict = pred_scale.transform(X_predict)
+
             # Scaling delle misure
             target = StandardScaler().fit_transform(
                 target.values.reshape(-1, 1))
@@ -321,7 +335,7 @@ for k in range(KFOLDS):
                 columns=['ETa'],
                 index=idx_test,
                 )
-            y_test_predict.sort_index()
+            y_test_predict.sort_index(inplace=True)
             y_predict = pd.DataFrame(
                 model.predict(X_predict),
                 columns=['ETa'],
@@ -331,14 +345,16 @@ for k in range(KFOLDS):
                 # Predictions plot
                 xs = [idx_train, idx_test, idx_predict]
                 ys = [y_fit_predict, y_test_predict, y_predict]
-                plot_imputation(xs, ys, target,
-                                title=f"Model {i+1} k{k+1} - {predictor}")
+                plot_imputation(
+                    xs, ys, target,
+                    title=f"Model {i+1} k{k+1} - {predictor} (scaled)")
 
                 # Linear plot
-                xs = [y_train, y_test]
-                ys = [y_fit_predict, y_test_predict]
-                plot_linear(xs, ys,
-                            title=f"Model {i+1} k{k+1} - {predictor}")
+                # xs = [y_train, y_test]
+                # ys = [y_fit_predict, y_test_predict]
+                # plot_linear(
+                #     xs, ys,
+                #     title=f"Model {i+1} k{k+1} - {predictor} (scaled)")
 
             if SAVE:
                 y_test_predict.to_csv(
@@ -348,8 +364,9 @@ for k in range(KFOLDS):
 
             scores_scld[predictor] = make_scores([y_train, y_fit_predict],
                                                  [y_test, y_test_predict],)
-            print("Predictor Scores")
-            print(scores_scld[predictor])
+            if VERBOSE:
+                print("Predictor Scores (scaled)")
+                print(scores_scld[predictor])
 
             # Rescale sets
             y_fit_predict, y_test_predict, y_predict, target = rescale_sets(
@@ -374,6 +391,10 @@ for k in range(KFOLDS):
             scores[predictor] = make_scores([y_train, y_fit_predict],
                                             [y_test, y_test_predict],)
 
+            if VERBOSE:
+                print("Predictor Scores")
+                print(scores[predictor])
+
             if PLOTS == 'rescaled' or PLOTS == 'all':
                 # Predictions plot
                 xs = [idx_train, idx_test, idx_predict]
@@ -382,37 +403,57 @@ for k in range(KFOLDS):
                                 title=f"Model {i+1} k{k+1} - {predictor}")
 
                 # Linear plot
-                xs = [eta.loc[idx_train].values,
-                      eta.loc[idx_test].values]
-                ys = [y_fit_predict, y_test_predict]
-                plot_linear(xs, ys,
-                            title=f"Model {i+1} k{k+1} - {predictor}")
+                # xs = [eta.loc[idx_train].values,
+                #       eta.loc[idx_test].values]
+                # ys = [y_fit_predict, y_test_predict]
+                # plot_linear(xs, ys,
+                #             title=f"Model {i+1} k{k+1} - {predictor}")
 
-        k_score = scores_scld['mlp'].join(scores_scld['rf'],
-                                          lsuffix='_mlp',
-                                          rsuffix='_rf')
+        k_score = (scores_scld['mlp']
+                   .join(scores_scld['rf'],
+                         lsuffix='_mlp',
+                         rsuffix='_rf')
+                   )
 
         k_scores_scld[i][k] = k_score
 
-        k_score = scores['mlp'].join(scores_scld['rf'],
-                                     lsuffix='_mlp',
-                                     rsuffix='_rf')
+        k_score = (scores['mlp']
+                   .join(scores['rf'],
+                         lsuffix='_mlp',
+                         rsuffix='_rf')
+                   )
 
         k_scores[i][k] = k_score
 
+# %% PRINT BEST SCORES
+print("\nBEST SCORES (rescaled)")
+for i in range(len(MODELS_FEATURES)):
+    print(f'\n{"***":<5} MODEL {i+1} {"***":>5}')
+    model_scores = pd.concat(k_scores[i], keys=range(1, KFOLDS+1))
+    best_r2 = model_scores.groupby(level=1).max().loc['r2']
+    best_rmse = model_scores.groupby(level=1).min().loc['rmse']
+    print(f"{'':7}{'MLP':^6} - {'RF':^6}\n"
+          f"{'r2:':7}"
+          f"{best_r2['test_mlp']:<5.4} - {best_r2['test_rf']:<10.4}\n"
+          f"{'rmse:':7}"
+          f"{best_rmse['test_mlp']:<5.4} - {best_rmse['test_rf']:<10.4}")
+
+# %% SAVE
 if SAVE:
     for i in range(len(MODELS_FEATURES)):
         m_scores_scld = pd.concat(
-            [k_scores_scld[i][k] for k in range(KFOLDS)],
+            k_scores_scld[i],
             axis=1,
             keys=range(KFOLDS))
-        m_scores_scld.to_csv(f'{ROOT}/PAPER/RESULTS/SCORES/'
-                             f'eta_predictions_m{i+1}_scores_scaled.csv',
+        m_scores_scld.to_csv(f'{ROOT}/PAPER/RESULTS/SCORES_TILL2021/'
+                             f'eta_pred_m{i+1}_scores_scld'
+                             f'_{RANDOM_STATE}_{SHUFFLE_SEED}.csv',
                              sep=';')
         m_scores = pd.concat(
-            [k_scores[i][k] for k in range(KFOLDS)],
+            k_scores[i],
             axis=1,
             keys=range(KFOLDS))
-        m_scores.to_csv(f'{ROOT}/PAPER/RESULTS/SCORES/'
-                        f'eta_predictions_m{i+1}_scores.csv',
+        m_scores.to_csv(f'{ROOT}/PAPER/RESULTS/SCORES_TILL2021/'
+                        f'eta_pred_m{i+1}_scores'
+                        f'_{RANDOM_STATE}_{SHUFFLE_SEED}.csv',
                         sep=';')

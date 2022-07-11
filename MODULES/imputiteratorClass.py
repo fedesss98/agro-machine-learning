@@ -639,7 +639,7 @@ if __name__ == '__main__':
     ITER_LIMIT = 1000
     INVALID_LIM = 10000
     MV_FRACTION = 0.2
-    FIT_FRACTION8 = 0.8
+    FIT_FRACTION = 0.8
 
     COLUMNS = [
         'Rs', 'U2', 'RHmin', 'RHmax',

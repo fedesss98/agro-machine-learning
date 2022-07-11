@@ -27,7 +27,7 @@ SAVE = True
 
 KFOLDS = 4
 
-ITER_LIMIT = 2
+ITER_LIMIT = 1
 INVALID_LIM = 1000
 
 MODELS_FEATURES = [
@@ -43,8 +43,8 @@ MODELS_FEATURES = [
         ['Rs', 'RHmin', 'RHmax', 'Tmin', 'Tmax'],  # 8
         ['ETo', 'SWC', 'NDVI', 'NDWI', 'DOY'],  # 9
         ['ETo', 'NDVI', 'NDWI', 'DOY'],  # 10
-        ['Rs', 'Tmin', 'Tmax', 'DOY'],  # 11
-        ['Rs', 'Tavg', 'RHavg', 'DOY'],  # 12
+        ['Rs', 'SWC', 'NDVI', 'NDWI', 'DOY'],  # 11
+        ['Rs', 'NDVI', 'NDWI', 'DOY'],  # 12
     ]
 
 eta = et.make_dataframe(

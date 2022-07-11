@@ -1,0 +1,3 @@
+- Aggiornato salvataggio delle predizioni: ora sono riscalate
+- Inseriti sns.relplot allo score watch per il set completo delle predizioni di tutti i folds
+

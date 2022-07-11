@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Wed Jun 15 15:46:54 2022
+Created on Sat Jun 18 17:26:29 2022
 
 @author: Federico Amato
-Once chosed the best predictor and the best fold, predict all the temporal
-series between 2018-2021
+Train a model on almost all measures of ETa but for the lasts BLIND_DAYS.
+Take scores on those lasts one by one.
+
+Predict the complete temporal series of ETa between 2018-2021
 """
+
 import copy
 import matplotlib.pyplot as plt
 import numpy as np
@@ -19,6 +22,8 @@ from sklearn.neural_network import MLPRegressor
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.tree import DecisionTreeRegressor
 
+from sklearn.metrics import mean_squared_error
+
 import MODULES.et_functions as et
 
 
@@ -28,10 +33,8 @@ DATABASE = '../../CSV/db_villabate_deficit_6.csv'
 SAVE = True
 PLOTS = None  # scaled / rescaled / all / None
 
-KFOLDS = 4
-
-EPOCHS = 1
 RANDOM_STATE = 12
+BLIND_DAYS = 4
 
 MODELS_FEATURES = [
         ['Rs', 'U2', 'RHmin', 'RHmax', 'Tmin',
@@ -46,8 +49,8 @@ MODELS_FEATURES = [
         ['Rs', 'RHmin', 'RHmax', 'Tmin', 'Tmax'],  # 8
         ['ETo', 'SWC', 'NDVI', 'NDWI', 'DOY'],  # 9
         ['ETo', 'NDVI', 'NDWI', 'DOY'],  # 10
-        ['Rs', 'Tmin', 'Tmax', 'DOY'],  # 11
-        ['Rs', 'Tavg', 'RHavg', 'DOY'],  # 12
+        ['Rs', 'SWC', 'NDVI', 'NDWI', 'DOY'],  # 11
+        ['Rs', 'NDVI', 'NDWI', 'DOY'],  # 12
     ]
 
 MLP_PARAMS = {
@@ -77,18 +80,19 @@ def get_eta():
         DATABASE,
         columns='ETa',
         start='2018-01-01',
+        # end='2021-11-30',
         method='drop',
         drop_index=True,
         )
     return eta
 
 
-def get_features(columns):
+def get_features():
     fts = et.make_dataframe(
         DATABASE,
         date_format='%Y-%m-%d',
-        columns=columns,
         start='2018-01-01',
+        # end='2021-11-30',
         method='impute',
         nn=5,
         drop_index=True,
@@ -134,6 +138,7 @@ def scale_sets(sample, *to_scale, dataframe=False):
                 scaled_list.append(scaled)
 
     return scaled_list
+
 
 def rescale_sets(sample, *to_scale, dataframe=False):
     """
@@ -203,78 +208,55 @@ def plot_prediction(eta, x, y):
     ax.scatter(x, y, label='Prediction')
 
 
-def get_folds_indexes(eta_idx, seed=6475):
-    # e si mescolano in modo random gli indici (date) di ETa
-    RNG = np.random.default_rng(seed=seed)
-    RNG.shuffle(eta_idx)
-    # Il set di ETa viene diviso in KFOLDS intervalli
-    # ogni intervallo è lungo 1/KFOLDS della lunghezza totale
-    chunk = int(len(eta_idx)/KFOLDS)
-    # Si esegue il programma prendendo di volta in volta come indici (date) dei
-    # MaiVisti uno di questi KFOLDS intervalli
-    idx_test_list = [[] for k in range(KFOLDS)]
-    idx_train_list = [[] for k in range(KFOLDS)]
-    for k in range(KFOLDS):
-        idx_test = eta_idx[k*chunk: (k+1)*chunk]
-        idx_test_list[k] = idx_test
-        idx_train_list[k] = [idx for idx in eta_idx
-                             if idx not in idx_test]
-
-    return idx_train_list, idx_test_list
+def predict_blinds(X, y):
+    scores = []
+    for d in range(BLIND_DAYS):
+        X_test = X[d].reshape(1, -1)
+        y_test = y[d]
+        # Predict
+        y_model = model.predict(X_test)
+        scores.append(mean_squared_error(y_test, y_model))
+    return np.sqrt(scores)
 
 
+features = get_features()
 eta = get_eta()
-eta_idx = copy.deepcopy(eta.index.values)
-idx_train_list, idx_test_list = get_folds_indexes(eta_idx)
 
+eta_idx = copy.deepcopy(eta.index.values)
+idx_train = eta_idx[:-BLIND_DAYS]
+idx_test = eta_idx[-BLIND_DAYS:]
+idx_predict = [idx for idx in features.index if idx not in idx_train]
+
+scores = {
+    'mlp': np.zeros((len(MODELS_FEATURES), BLIND_DAYS)),
+    'rf': np.zeros((len(MODELS_FEATURES), BLIND_DAYS))
+    }
 
 # %% MAIN
 for i, columns in enumerate(MODELS_FEATURES):
-    features = get_features(columns)
 
     target = eta.copy()
 
+    X_train = features.loc[idx_train, columns]
+    y_train = target.loc[idx_train]
+    X_test = features.loc[idx_test, columns]
+    y_test = target.loc[idx_test]
+    X_predict = features.loc[idx_predict, columns]
+
+    # Scaling
+    X_train, X_test, X_predict = scale_sets(
+        X_train, X_train, X_test, X_predict)
+    y_train, y_test = scale_sets(y_train, y_train, y_test)
+
     for predictor in PREDICTORS:
-        k_r2 = np.zeros((KFOLDS))
-        for k in range(KFOLDS):
-            print(f'\n{"***":<5} MODEL {i+1} '
-                  f'// k{k+1} '
-                  f'// {predictor} {"***":>5}')
-            model = PREDICTORS[predictor]
-            idx_train = idx_train_list[k]
-            idx_test = idx_test_list[k]
-
-            X_train = features.loc[idx_train]
-            y_train = target.loc[idx_train]
-            X_test = features.loc[idx_test]
-            y_test = target.loc[idx_test]
-
-            # Scaling dei dati
-            X_train, X_test = scale_sets(
-                X_train, X_train, X_test)
-            y_train, y_test = scale_sets(
-                y_train, y_train, y_test)
-
-            model.fit(X_train, y_train.ravel())
-            k_r2[k] = model.score(X_test, y_test.ravel())
-
-        print("Best Predictor Score:")
-        print(f"{k_r2.max():.4f} at fold {k_r2.argmax()}", end='\n\n')
-        best_k = k_r2.argmax()
+        print(f'\n{"***":<5} MODEL {i+1} '
+              f'// {predictor} {"***":>5}')
         model = PREDICTORS[predictor]
-        idx_train = idx_train_list[best_k]
-        idx_predict = [idx for idx in features.index
-                       if idx not in idx_train]
-        X_train = features.loc[idx_train]
-        y_train = target.loc[idx_train]
-        X_predict = features.loc[idx_predict]
-
-        # Scaling
-        X_train, X_predict = scale_sets(
-            X_train, X_train, X_predict)
-        y_train = scale_sets(y_train)
-
         model.fit(X_train, y_train.ravel())
+
+        # %% SCORES ON BLIND DAYS
+        rmse = predict_blinds(X_test, y_test)
+        scores[predictor][i] = [e for e in rmse]
 
         # %% PREDICTION
         y_predict = model.predict(X_predict)
@@ -304,6 +286,7 @@ for i, columns in enumerate(MODELS_FEATURES):
             style='source',
             hue='source')
         plt.xticks(rotation=50)
+
         plt.suptitle(f'Model {i+1} predictions ({predictor})')
         plt.show()
 
@@ -313,3 +296,18 @@ for i, columns in enumerate(MODELS_FEATURES):
                 f'eta_total_prediction_m{i+1}_{predictor}.csv',
                 sep=';'
                 )
+
+# %% PLOT SCORES
+for predictor, pred_scores in scores.items():
+    for model in range(len(MODELS_FEATURES)):
+        fig, ax = plt.subplots(figsize=(5, 5))
+        ax.plot(np.arange(1, BLIND_DAYS+1), pred_scores[model],
+                '--o', mfc='none', color='black')
+        fig.suptitle("Scores on subsequent days (scaled data)")
+        ax.set_title(f"Model {model+1} ({predictor})")
+        ax.set_ylabel("Mean Squared Error")
+        ax.set_xlabel("Days")
+        if SAVE:
+            plt.savefig(f"{ROOT}PAPER/PLOTS/"
+                        f"BLIND_DAYS/scores_m{model+1}_{predictor}")
+        plt.show()
