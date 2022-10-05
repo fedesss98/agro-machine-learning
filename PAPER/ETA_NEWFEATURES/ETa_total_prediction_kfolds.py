@@ -26,7 +26,7 @@ import MODULES.et_functions as et
 ROOT = '../../'
 DATABASE = '../../CSV/db_villabate_deficit_6.csv'
 
-SAVE = False
+SAVE = True
 PLOTS = None  # scaled / rescaled / all / None
 
 KFOLDS = 4
