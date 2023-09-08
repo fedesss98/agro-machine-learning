@@ -108,16 +108,7 @@ class ImputeIterator:
         print("Benvenuti nell'ImputeIterator")
 
     def description(self):
-        desc = (
-            "Classe Imputiterator\n"
-            "Fitta su Features X e imputa il set target.\n"
-            "_________\nParametri:\n"
-            f"Invalid Series Limit = {self.inv_series_lim}\n"
-            f"Iterations Limit: {self.iter_limit}\n"
-            f"Train Fraction: {self.train_fraction}"
-        )
-
-        return desc
+        return f"Classe Imputiterator\nFitta su Features X e imputa il set target.\n_________\nParametri:\nInvalid Series Limit = {self.inv_series_lim}\nIterations Limit: {self.iter_limit}\nTrain Fraction: {self.train_fraction}"
 
     def fit(self, features, target, model=first_model):
         self.fitted = True
@@ -395,7 +386,7 @@ class ImputeIterator:
             # Output finale con i tre punteggi
             self.__print_output(i, valid_iter)
             # Continua con le iterazioni
-            i = i + 1
+            i += 1
         mse_scores = np.array(self.score_mv)[:, 1]
         mbe_scores = np.array(self.score_mv)[:, 2]
         self.min_mse = min(mse_scores, key=abs)

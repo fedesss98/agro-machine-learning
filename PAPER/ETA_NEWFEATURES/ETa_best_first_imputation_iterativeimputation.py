@@ -68,7 +68,7 @@ df.drop(index=df.loc['2020-02'].index, inplace=True)
 # Si inseriscono i contenuti idrici al suolo medi
 df.insert(12, 'soil_humidity', df.iloc[:, 0:6].mean(axis=1))
 # e si eliminano quelli alle diverse profondità
-df.drop(df.columns[0:12], axis=1, inplace=True)
+df.drop(df.columns[:12], axis=1, inplace=True)
 # Si eliminano le Deviazioni degli indici ND
 # e le Precipitazioni e le Irrigazioni
 df.drop(columns=['Std NDWI', 'Std NDVI', 'I', 'P'], inplace=True)
@@ -174,7 +174,7 @@ features_visti = (StandardScaler()
 # Il modello è addestrato su tutti i dati visti
 if REFIT:
     print("Refitting Model on Measured+Imputed data")
-    for epoch in tqdm(range(EPOCHS)):
+    for _ in tqdm(range(EPOCHS)):
         model.fit(features_visti, target_visti.values.ravel())
 print("Predicting MaiVisti")
 # E si fa una predizione dei dati MaiVisti

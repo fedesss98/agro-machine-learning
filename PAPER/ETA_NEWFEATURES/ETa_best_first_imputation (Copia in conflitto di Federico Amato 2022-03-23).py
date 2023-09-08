@@ -81,7 +81,7 @@ df.drop(index=df.loc['2020-02'].index, inplace=True)
 # Si inseriscono i contenuti idrici al suolo medi
 df.insert(12, 'soil_humidity', df.iloc[:, 0:6].mean(axis=1))
 # e si eliminano quelli alle diverse profondità
-df.drop(df.columns[0:12], axis=1, inplace=True)
+df.drop(df.columns[:12], axis=1, inplace=True)
 # Si eliminano le Deviazioni degli indici ND
 df.drop(columns=['Std NDWI', 'Std NDVI'], inplace=True)
 # E si rinominano gli indici con lo snake_case
@@ -179,7 +179,7 @@ plt.xticks(rotation=45)
 
 # IMPUTAZIONE ITERATIVA
 # A ogni iterazione si imputa e sostituisce
-for i in range(ITERATIONS):
+for _ in range(ITERATIONS):
     y = target_total['ETa']
     X = features.loc[y.index]
     model.set_params(warm_start=False)
@@ -188,7 +188,7 @@ for i in range(ITERATIONS):
         X, y, test_size=0.3, random_state=RANDOM_STATE
     )
     print("Predicting ETa")
-    for epoch in tqdm(range(EPOCHS)):
+    for _ in tqdm(range(EPOCHS)):
         model.fit(X_train.values, y_train)
 
     y_predicted = pd.DataFrame(model.predict(X_test.values),

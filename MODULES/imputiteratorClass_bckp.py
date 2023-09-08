@@ -97,34 +97,26 @@ class ImputeIterator:
         print("Benvenuti nell'ImputeIterator")
 
     def description(self):
-        desc = ('Classe Imputiterator\n'
-                'Fitta su Features X e imputa il set target.\n'
-                '_________\nParametri:\n'
-                f'Invalid Series Limit = {self.invalid_series_limit}\n'
-                f'Iterations Limit: {self.iter_limit}\n'
-                f'Train Fraction: {self.train_fraction}')
-
-        return desc
+        return f'Classe Imputiterator\nFitta su Features X e imputa il set target.\n_________\nParametri:\nInvalid Series Limit = {self.invalid_series_limit}\nIterations Limit: {self.iter_limit}\nTrain Fraction: {self.train_fraction}'
 
     def fit(self, X):
         self.fitted = True
         self.X = X
 
     def impute(self, target, maivisti_size=0.25):
-        if self.fitted:
-            # Si trasforma la Serie in DataFrame
-            if isinstance(target, pd.Series):
-                target = target.to_frame()
-            self.target = target
-            self.target_name = target.columns[0]
-            self.maivisti_size = int(len(self.target)*maivisti_size)
-            self.max_score = 0
-
-            self.main()
-            self.print_ending()
-        else:
+        if not self.fitted:
             raise Exception('You need to fit the Imputer first!')
 
+        # Si trasforma la Serie in DataFrame
+        if isinstance(target, pd.Series):
+            target = target.to_frame()
+        self.target_name = target.columns[0]
+        self.target = target
+        self.maivisti_size = int(len(self.target)*maivisti_size)
+        self.max_score = 0
+
+        self.main()
+        self.print_ending()
         return self.y
 
     def fit_impute(self, X, target, maivisti_size=0.25):
@@ -435,7 +427,7 @@ class ImputeIterator:
             # Output finale con i tre punteggi
             self.print_output(i, valid_iter, maivisti_mse)
             # Continua con le iterazioni
-            i = i + 1
+            i += 1
 
         y = self.y.values.reshape(-1, 1)
         y = StandardScaler().fit(self.target).inverse_transform(y).ravel()

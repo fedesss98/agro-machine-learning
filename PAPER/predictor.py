@@ -37,12 +37,11 @@ def clear_log(LOG, n=-1):
         print("LOG File not found...")
     if n<0:
         csv.drop(csv.index, inplace=True)
-        csv.reset_index(drop=True, inplace=True)
-        csv.to_csv(LOG, sep=';', index=False)
     else:
         csv.drop(csv.tail(n).index, inplace=True)
-        csv.reset_index(drop=True, inplace=True)
-        csv.to_csv(LOG, sep=';', index=False)
+
+    csv.reset_index(drop=True, inplace=True)
+    csv.to_csv(LOG, sep=';', index=False)
 
     # print("Lines in Log file after cleaning:")
     # print(csv)
@@ -71,10 +70,7 @@ def write_log(inp, outp, results_df, LOG=False):
         results_df.to_csv(LOG, sep=';', index=False)
 
 def make_list_from_params(models):
-    model_params_list = []
-    for model in models:
-        model_params_list.append(model_params[model])
-    return model_params_list
+    return [model_params[model] for model in models]
 
 
 def extract_dataset(path):
@@ -130,8 +126,7 @@ def average_feature(df, features):
 
 def rescale_data(data_to_scale, scaler, data_to_fit):
     scaler.fit(np.array(data_to_fit).reshape(-1, 1))
-    data_scaled = scaler.inverse_transform(data_to_scale)
-    return data_scaled
+    return scaler.inverse_transform(data_to_scale)
 
 
 def scale_data(data_to_scale, scaler):
@@ -184,7 +179,6 @@ def predict_target(df, model):
     return prediction, score
 
 def print_warning(path):
-    SAVE_CHECK = True
     filename = make_filename(path)
 
     if os.path.exists(filename):
@@ -194,10 +188,7 @@ def print_warning(path):
     else:
         message = '\n'.join((f'Sicuro di voler salvare il nuovo file {filename}?',
                                  'Premere Invio per continuare o inserire un imput per annullare:'))
-    if(input(message)):
-        SAVE_CHECK = False
-
-    return SAVE_CHECK
+    return not (input(message))
 
 def print_model_output(X, y, score, filename, model, out_params):
     reg = LinearRegression(fit_intercept=False)
@@ -264,11 +255,7 @@ def start_prediction(PATHS, out_params, **in_params):
         print('\n___________________\n')
 
         path_results.insert(0, 'Path', path)
-        if out_params['SAVE_CHECK']:
-            filename = make_filename(path)
-        else:
-            filename = None
-
+        filename = make_filename(path) if out_params['SAVE_CHECK'] else None
         path_results.insert(6, 'FigName', filename)
 
         results = results.append(path_results)

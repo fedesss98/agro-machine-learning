@@ -120,17 +120,17 @@ results = permutation_importance(model, X, y)
 importances = results.importances_mean
 features = df_total.iloc[:,:-1].columns
 df_fi = pd.Series(importances, index=features,name='Importance').sort_values(ascending=False)
-print(f'{"Feature":{8}} -  Importance Score\n____________________________')
+print(f"{'Feature':8} -  Importance Score\n____________________________")
 for feature, importance in df_fi.iteritems():
-    print(f'{feature:{11}} {importance:.3}')
+    print(f'{feature:11} {importance:.3}')
 
 plt.barh(df_fi.index, df_fi.values)
 # plt.title('Feature Importance in ETa predictions')
 plt.yticks(fontsize = 14)
 plt.xticks(fontsize = 14)
 plt.tight_layout()
-plt.savefig('Images/Features_importance2.png') 
-plt.savefig('Images/Features_importance2.pdf') 
+plt.savefig('Images/Features_importance2.png')
+plt.savefig('Images/Features_importance2.pdf')
 plt.savefig('Images/Features_importance2.eps') 
 
 #%% HEATMAP
@@ -141,9 +141,9 @@ sns.heatmap(corr_df, annot=True, center=0, cmap='RdBu_r')
 # plt.suptitle('Correlation Coefficient', fontsize=13, y=0.92)
 plt.xticks(fontsize = 12, rotation = 90)
 plt.yticks(fontsize = 12, rotation = 0)
-plt.savefig('Images/pearson.png') 
-plt.savefig('Images/pearson.pdf') 
-plt.savefig('Images/pearson.eps') 
+plt.savefig('Images/pearson.png')
+plt.savefig('Images/pearson.pdf')
+plt.savefig('Images/pearson.eps')
 plt.show()
 
 #%% SCATTERMATRIX

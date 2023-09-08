@@ -92,29 +92,27 @@ PREDICTORS = {
 
 
 def get_eta():
-    eta = et.make_dataframe(
+    return et.make_dataframe(
         DATABASE,
         columns='ETa',
         start='2018-01-01',
-        end='2021-11-30', # 2021-07-01
+        end='2021-11-30',  # 2021-07-01
         method='drop',
         drop_index=True,
-        )
-    return eta
+    )
 
 
 def get_features(columns):
-    fts = et.make_dataframe(
+    return et.make_dataframe(
         DATABASE,
         date_format='%Y-%m-%d',
         columns=columns,
         start='2018-01-01',
-        end='2021-11-30', # 2021-07-01
+        end='2021-11-30',  # 2021-07-01
         method='impute',
         nn=5,
         drop_index=True,
-        )
-    return fts
+    )
 
 
 def scale_sets(X_train, y_train, X_test, y_test):
@@ -148,8 +146,7 @@ def rescale_sets(eta, *ys):
 
 
 def get_linear_models():
-    models = dict()
-    models['Huber'] = HuberRegressor()
+    models = {'Huber': HuberRegressor()}
     models['RANSAC'] = RANSACRegressor()
     models['TheilSen'] = TheilSenRegressor()
     return models
@@ -169,9 +166,8 @@ def evalute_model(X, y, model, name):
 
 
 def plot_imputation(x, y, eta=None, **kwargs):
-    suptitle = (kwargs.get('suptitle') if 'suptitle' in kwargs
-                else 'ETa Imputation')
-    title = kwargs.get('title') if 'title' in kwargs else None
+    suptitle = kwargs.get('suptitle', 'ETa Imputation')
+    title = kwargs.get('title', None)
     # Setup figure
     fig, ax = plt.subplots(figsize=(10, 6))
     fig.suptitle(suptitle, fontsize=18, weight='bold')
@@ -198,9 +194,8 @@ def plot_imputation(x, y, eta=None, **kwargs):
 
 
 def plot_linear(x, y, **kwargs):
-    suptitle = (kwargs.get('suptitle') if 'suptitle' in kwargs
-                else 'ETa Regression')
-    title = kwargs.get('title') if 'title' in kwargs else None
+    suptitle = kwargs.get('suptitle', 'ETa Regression')
+    title = kwargs.get('title', None)
     # Setup figure
     fig, ax = plt.subplots(figsize=(10, 6))
     fig.suptitle(suptitle, fontsize=18, weight='bold')
@@ -215,8 +210,8 @@ def plot_linear(x, y, **kwargs):
                  plot_type='scatter', legend='Test Predictions')
 
     models = get_linear_models()
-    results = dict()
-    print_scores = kwargs.get('verbose') if 'verbose' in kwargs else False
+    results = {}
+    print_scores = kwargs.get('verbose', False)
     if print_scores:
         print("Linear Regressions:")
     for name, model in models.items():
@@ -278,10 +273,10 @@ chunk = int(len(eta_idx)/KFOLDS)
 
 scores_scld = {}
 scores = {}
-k_scores_scld = [[0 for i in range(KFOLDS)]
-                 for j in range(len(MODELS_FEATURES))]
-k_scores = [[0 for i in range(KFOLDS)]
-            for j in range(len(MODELS_FEATURES))]
+k_scores_scld = [
+    [0 for _ in range(KFOLDS)] for _ in range(len(MODELS_FEATURES))
+]
+k_scores = [[0 for _ in range(KFOLDS)] for _ in range(len(MODELS_FEATURES))]
 
 # %% MAIN
 for k in range(KFOLDS):
@@ -341,7 +336,7 @@ for k in range(KFOLDS):
                 columns=['ETa'],
                 index=idx_predict,
                 )
-            if PLOTS == 'scaled' or PLOTS == 'all':
+            if PLOTS in ['scaled', 'all']:
                 # Predictions plot
                 xs = [idx_train, idx_test, idx_predict]
                 ys = [y_fit_predict, y_test_predict, y_predict]
@@ -395,7 +390,7 @@ for k in range(KFOLDS):
                 print("Predictor Scores")
                 print(scores[predictor])
 
-            if PLOTS == 'rescaled' or PLOTS == 'all':
+            if PLOTS in ['rescaled', 'all']:
                 # Predictions plot
                 xs = [idx_train, idx_test, idx_predict]
                 ys = [y_fit_predict, y_test_predict, y_predict]

@@ -103,10 +103,7 @@ class ImputeIterator:
 
         # first_model = RandomForestRegressor(n_estimators=365,random_state=58)
         self.first_model = self.first_mlp
-        if model is None:
-            self.model = self.first_mlp
-        else:
-            self.model = model
+        self.model = self.first_mlp if model is None else model
         self.model_final = model
         self.model_test = RandomForestRegressor(
             random_state=self.RF_RAND_STATE,)
@@ -121,16 +118,7 @@ class ImputeIterator:
         print("Benvenuti nell'ImputeIterator")
 
     def description(self):
-        desc = (
-            "Classe Imputiterator\n"
-            "Fitta su Features X e imputa il set target.\n"
-            "_________\nParametri:\n"
-            f"Invalid Series Limit = {self.inv_series_lim}\n"
-            f"Iterations Limit: {self.iter_limit}\n"
-            f"Train Fraction: {self.train_fraction}"
-        )
-
-        return desc
+        return f"Classe Imputiterator\nFitta su Features X e imputa il set target.\n_________\nParametri:\nInvalid Series Limit = {self.inv_series_lim}\nIterations Limit: {self.iter_limit}\nTrain Fraction: {self.train_fraction}"
 
     def fit(self, features, target, model=None):
         self.fitted = True
@@ -251,11 +239,9 @@ class ImputeIterator:
                 len(self.fts_visti.index) * (1-self.train_fraction)
                 )
             idx_predict_imputed = self.RNG.choice(
-                idx_free,
-                size=int(predict_len/2),
-                replace=False,
+                idx_free, size=predict_len // 2, replace=False
             )
-            idx_predict_measured = self.idx_predict[:int(predict_len/2)]
+            idx_predict_measured = self.idx_predict[:predict_len // 2]
 
             idx_predict = np.append(idx_predict_imputed, idx_predict_measured)
             idx_train = [
@@ -314,14 +300,11 @@ class ImputeIterator:
             y_test_measures = y_test.loc[subset]
             y_predict_measures = y_predict.loc[subset]
             test_score = r2_score(y_test_measures, y_predict_measures)
-            test_mse = mean_squared_error(y_test, y_predict)
-            test_mbe = et.mean_bias_error(y_test, y_predict)
-            test_score = [[test_score, test_mse, test_mbe]]
         else:
             test_score = r2_score(y_test, y_predict)
-            test_mse = mean_squared_error(y_test, y_predict)
-            test_mbe = et.mean_bias_error(y_test, y_predict)
-            test_score = [[test_score, test_mse, test_mbe]]
+        test_mse = mean_squared_error(y_test, y_predict)
+        test_mbe = et.mean_bias_error(y_test, y_predict)
+        test_score = [[test_score, test_mse, test_mbe]]
         return y_predict, test_score
 
     def __check_valid_iteration(self, y_temp):
@@ -485,7 +468,7 @@ class ImputeIterator:
                 self.__print_output(i, valid_iter)
 
             # Continua con le iterazioni
-            i = i + 1
+            i += 1
         mse_scores = np.array(self.score_mv)[:, 1]
         mbe_scores = np.array(self.score_mv)[:, 2]
         self.min_mse = min(mse_scores[1:])
@@ -511,7 +494,7 @@ class ImputeIterator:
             x='Day', y='ETa',
             style='source', hue='source')
         plt.xticks(rotation=90)
-        plt.title(kwargs.get('title') if 'title' in kwargs else 'Imputation')
+        plt.title(kwargs.get('title', 'Imputation'))
         plt.show()
 
     def plot_imputation(self, **kwargs):
@@ -564,16 +547,7 @@ class ImputeIterator:
 
     def __print_output(self, i, valid_iter):
         inserted = "\u2713" if valid_iter else "X"
-        if self.verbose:
-            print(
-                f'{i:<}\t{self.score_t[-1, 0]:>13.4}'
-                f'({self.measured_rateo[-1]:.0%})'
-                f'\t{self.score_mv[-1][0]:>11.4}'
-                f'\t\t{math.sqrt(self.score_mv[-1][1]):>11.4}'
-                f'\t\t{self.score_mv[-1][2]:>11.4}'
-                f'\t{inserted:>8}'
-                )
-        elif valid_iter:
+        if self.verbose or valid_iter:
             print(
                 f'{i:<}\t{self.score_t[-1, 0]:>13.4}'
                 f'({self.measured_rateo[-1]:.0%})'

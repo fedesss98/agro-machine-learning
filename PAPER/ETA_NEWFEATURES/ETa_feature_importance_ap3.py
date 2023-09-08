@@ -106,9 +106,9 @@ model.fit(X,y)
 importances = model.feature_importances_
 features = df_total.iloc[:,:-1].columns
 df_fi = pd.Series(importances, index=features,name='Importance').sort_values(ascending=False)
-print(f'{"Feature":{8}} -  Importance Score\n____________________________')
+print(f"{'Feature':8} -  Importance Score\n____________________________")
 for feature, importance in df_fi.iteritems():
-    print(f'{feature:{11}} {importance:.3}')
+    print(f'{feature:11} {importance:.3}')
 
 plt.barh(df_fi.index, df_fi.values)
 plt.title('Feature Importance in ETa predictions')

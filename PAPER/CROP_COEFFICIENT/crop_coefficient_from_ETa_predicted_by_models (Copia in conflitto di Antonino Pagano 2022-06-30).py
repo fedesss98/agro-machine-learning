@@ -27,13 +27,13 @@ import MODULES.et_functions as et
 def get_eta_predicted():
     database = (f'{ROOT}PAPER/RESULTS/PREDICTIONS/'
                 f'eta_total_prediction_m{m}_{predictor}.csv')
-    eta = pd.read_csv(database,
-                      sep=';',
-                      index_col=0,
-                      parse_dates=True,
-                      infer_datetime_format=True)
-
-    return eta
+    return pd.read_csv(
+        database,
+        sep=';',
+        index_col=0,
+        parse_dates=True,
+        infer_datetime_format=True,
+    )
 
 
 def get_et_measures(database):
@@ -78,9 +78,9 @@ def plot_kc(data, x, y, hue, theoretical=False, **kwargs):
         ax = plot_trapezoidal(ax)
     ax.legend(loc='upper left')
     title = 'Kc Measured and Predicted'
-    title = kwargs.get('title') if 'title' in kwargs else title
-    xlabel = kwargs.get('xlabel') if 'xlabel' in kwargs else x
-    ylabel = kwargs.get('ylabel') if 'ylabel' in kwargs else y
+    title = kwargs.get('title', title)
+    xlabel = kwargs.get('xlabel', x)
+    ylabel = kwargs.get('ylabel', y)
     if 'ylim' in kwargs:
         ylim = kwargs.get('ylim')
         ax.set_ylim(ylim)
@@ -95,16 +95,16 @@ def plot_kc(data, x, y, hue, theoretical=False, **kwargs):
 
 def get_trapezoidal():
     database = '../../CSV/KC/Trapezoidal_Kc.csv'
-    kc = pd.read_csv(database,
-                     sep=';',
-                     decimal=',',
-                     header=[1],
-                     index_col=0,
-                     parse_dates=True,
-                     infer_datetime_format=True, dayfirst=True
-                     )
-    # kc = kc.loc[:'2021-11-30']
-    return kc
+    return pd.read_csv(
+        database,
+        sep=';',
+        decimal=',',
+        header=[1],
+        index_col=0,
+        parse_dates=True,
+        infer_datetime_format=True,
+        dayfirst=True,
+    )
 
 
 def plot_trapezoidal(ax, **kwargs):
@@ -161,7 +161,7 @@ PREDICTORS = ['mlp', 'rf']
 PLOT_ETA = False
 SAVE = True
 
-num_outliers = [{'mlp': 0, 'rf': 0} for i in MODELS]
+num_outliers = [{'mlp': 0, 'rf': 0} for _ in MODELS]
 
 # %% MAIN
 # Get ETa and ET0 measured
