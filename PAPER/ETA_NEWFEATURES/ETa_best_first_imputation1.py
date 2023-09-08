@@ -107,8 +107,7 @@ def rescale_sets(eta, *ys):
 
 
 def get_linear_models():
-    models = dict()
-    models['Huber'] = HuberRegressor()
+    models = {'Huber': HuberRegressor()}
     models['RANSAC'] = RANSACRegressor()
     models['TheilSen'] = TheilSenRegressor()
     return models
@@ -128,9 +127,8 @@ def evalute_model(X, y, model, name):
 
 
 def plot_imputation(x, y, eta=None, **kwargs):
-    suptitle = (kwargs.get('suptitle') if 'suptitle' in kwargs
-                else 'ETa Imputation')
-    title = kwargs.get('title') if 'title' in kwargs else None
+    suptitle = kwargs.get('suptitle', 'ETa Imputation')
+    title = kwargs.get('title', None)
     # Setup figure
     fig, ax = plt.subplots(figsize=(10, 6))
     fig.suptitle(suptitle, fontsize=18, weight='bold')
@@ -153,7 +151,7 @@ def plot_imputation(x, y, eta=None, **kwargs):
 def plot_linear(x, y, **kwargs):
     # suptitle = (kwargs.get('suptitle') if 'suptitle' in kwargs
     #             else 'ETa Regression')
-    title = kwargs.get('title') if 'title' in kwargs else None
+    title = kwargs.get('title', None)
     # Setup figure
     fig, ax = plt.subplots(figsize=(10, 10))
     # fig.suptitle(suptitle, fontsize=18, weight='bold')
@@ -163,7 +161,7 @@ def plot_linear(x, y, **kwargs):
     plt.ylabel('Predicted ETa [mm/day]', fontsize=30)
     plt.xlim([0, 6])
     plt.ylim([0, 6])
- 
+
     # Train
     et.plot_axis(ax, [x[0], y[0], 'gray'],
                  alpha=0.1,
@@ -172,8 +170,8 @@ def plot_linear(x, y, **kwargs):
     et.plot_axis(ax, [x[1], y[1], 'black'],
                  plot_type='scatter', legend='Test Predictions')
     models = get_linear_models()
-    results = dict()
-    print_scores = kwargs.get('verbose') if 'verbose' in kwargs else False
+    results = {}
+    print_scores = kwargs.get('verbose', False)
     if print_scores:
         print("Linear Regressions:")
     for name, model in models.items():
@@ -200,11 +198,11 @@ def plot_linear(x, y, **kwargs):
     plt.plot(x, x + 0, '--r') # dashdot black
     plt.savefig(f'{ROOT}/PAPER/RESULTS/RESULTS_AP/'
                     f'eta_predictions_m{i+1}_k{k+1}_{predictor}.png'
-                    ) 
+                    )
     plt.savefig(f'{ROOT}/PAPER/RESULTS/RESULTS_AP/'
-                    f'eta_predictions_m{i+1}_k{k+1}_{predictor}.pdf') 
+                    f'eta_predictions_m{i+1}_k{k+1}_{predictor}.pdf')
     plt.savefig(f'{ROOT}/PAPER/RESULTS/RESULTS_AP/'
-                    f'eta_predictions_m{i+1}_k{k+1}_{predictor}.eps') 
+                    f'eta_predictions_m{i+1}_k{k+1}_{predictor}.eps')
     plt.show()
 
 
@@ -238,7 +236,7 @@ chunk = int(len(eta_idx)/KFOLDS)
 # MaiVisti uno di questi KFOLDS intervalli
 
 scores = {}
-k_scores = [[0 for i in range(KFOLDS)] for j in range(len(MODELS_FEATURES))]
+k_scores = [[0 for _ in range(KFOLDS)] for _ in range(len(MODELS_FEATURES))]
 
 # %% MAIN
 for k in range(KFOLDS):

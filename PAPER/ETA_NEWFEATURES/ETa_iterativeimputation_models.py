@@ -7,6 +7,7 @@ Created on Fri Feb 18 06:03:46 2022
 Classe Imputiterator
 Fitta su Features X e imputa il set target
 """
+
 import copy
 import numpy as np
 import pandas as pd
@@ -66,14 +67,14 @@ RNG = np.random.default_rng(seed=6475)
 RNG.shuffle(eta_idx)
 # Il set di ETa viene diviso in KFOLDS intervalli
 # ogni intervallo è lungo 1/KFOLDS della lunghezza totale
-chunk = int(len(eta_idx)/KFOLDS)
+chunk = len(eta_idx) // KFOLDS
 # Si esegue il programma prendendo di volta in volta come indici (date) dei
 # MaiVisti uno di questi KFOLDS intervalli
 for n in range(KFOLDS):
     if n != KFOLDS-1:
         idx_maivisti = eta_idx[n*chunk: (n+1)*chunk]
     else:
-        idx_maivisti = eta_idx[n*chunk: len(eta_idx)]
+        idx_maivisti = eta_idx[n*chunk:]
     y_idx = np.sort(idx_maivisti)
     plt.plot(y_idx)
     plt.title(f"Index of Test data ({len(idx_maivisti)}) for k {n+1}")

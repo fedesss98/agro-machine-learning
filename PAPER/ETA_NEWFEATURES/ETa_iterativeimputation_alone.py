@@ -7,6 +7,7 @@ Created on Fri Feb 18 06:03:46 2022
 Classe Imputiterator
 Fitta su Features X e imputa il set target
 """
+
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -37,7 +38,7 @@ features.drop(index=features.loc['2020-02'].index, inplace=True)
 # Si inseriscono i contenuti idrici al suolo medi
 features.insert(6, 'soil_humidity', features.iloc[:, 0:6].mean(axis=1))
 # e si eliminano quelli alle diverse profondità
-features.drop(features.columns[0:6], axis=1, inplace=True)
+features.drop(features.columns[:6], axis=1, inplace=True)
 features.insert(0, 'gregorian_day', features.index.dayofyear)
 
 target = et.make_dataframe(

@@ -91,7 +91,7 @@ y = df_measured['ETa']
 # Si usa una frazione del set per l'addestramento
 # e una per il test e la predizione di K.
 X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=0.8)
-y_prediction = dict()
+y_prediction = {}
 bestR2 = [0,0]
 
 # Si cercano outliers nel set di addestramento.
@@ -154,7 +154,7 @@ et.plot_axis(ax, [y_train.index, y_train.values, 'lightgrey'], **ax_par, **fig_p
 # Grafico degli ETa  misurati usati per il Test
 et.plot_axis(ax, [y_test.index, y_test.values, 'black'], **ax_par, legend='Test')
 # Grafici degli ETa predetti usando le Features per il test
-for name in MODELS.keys():
+for name in MODELS:
     legend = f'Prediction with {name} ($R^2 = {y_prediction[name][1]:.2f}$)'
     et.plot_axis(ax, [y_test.index, y_prediction[name][0]], **ax_par, legend=legend)
 ax.legend()
@@ -163,7 +163,7 @@ ax.legend()
 
 # Quanto solo lontani i valori predetti da quelli misurati?
 # Quanto bene si assestano su una retta di pendenza 1?
-for name in MODELS.keys():
+for name in MODELS:
     fig2, ax2 = plt.subplots()
     fig2_par = {
         'title': f'ETa Prediction with {name} ($R^2 = {y_prediction[name][1]:.2f}$)',

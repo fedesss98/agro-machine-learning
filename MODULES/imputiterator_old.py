@@ -42,9 +42,13 @@ def complete_set(df, target, real_data):
 def iteration_loop(df, target, n=100):
     loop = 0
     best_score = 0
-    while(df[target].count() < len(df.index)):
+    while (df[target].count() < len(df.index)):
         loop = loop + 1
-        train_cols = [cols for cols in df.columns if cols != target and cols != f'{target}_completed']
+        train_cols = [
+            cols
+            for cols in df.columns
+            if cols not in [target, f'{target}_completed']
+        ]
         X = df.loc[:,train_cols] # features fino a ET0 compresa
         y = df.loc[:,f'{target}_completed'] # Target Misurato completato con quello Predetto
         train_len = len(df.index)-n

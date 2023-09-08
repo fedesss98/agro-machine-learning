@@ -74,29 +74,27 @@ PREDICTORS = {
 
 
 def get_eta():
-    eta = et.make_dataframe(
+    return et.make_dataframe(
         DATABASE,
         columns='ETa',
         start='2018-01-01',
-        end='2021-11-30', #2021-03-01
+        end='2021-11-30',  # 2021-03-01
         method='drop',
         drop_index=True,
-        )
-    return eta
+    )
 
 
 def get_features(columns):
-    fts = et.make_dataframe(
+    return et.make_dataframe(
         DATABASE,
         date_format='%Y-%m-%d',
         columns=columns,
         start='2018-01-01',
-        end='2021-11-30',  #2021-03-01
+        end='2021-11-30',  # 2021-03-01
         method='impute',
         nn=5,
         drop_index=True,
-        )
-    return fts
+    )
 
 
 def scale_sets(sample, *to_scale, dataframe=False):
@@ -105,7 +103,7 @@ def scale_sets(sample, *to_scale, dataframe=False):
     neanche tramite lo Scaler
     """
     scaler = StandardScaler()
-    if isinstance(sample, pd.DataFrame) or isinstance(sample, pd.Series):
+    if isinstance(sample, (pd.DataFrame, pd.Series)):
         if len(sample.shape) < 2:
             sample = sample.values.reshape(-1, 1)
         else:
@@ -114,25 +112,19 @@ def scale_sets(sample, *to_scale, dataframe=False):
         if len(sample.shape) < 2:
             sample = sample.reshape(-1, 1)
     scaler.fit(sample)
-    if len(to_scale) == 0:
+    if not to_scale:
         scaled_list = scaler.transform(sample)
     else:
         scaled_list = []
         for y in to_scale:
-            if isinstance(y, pd.DataFrame) or isinstance(y, pd.Series):
-                if len(y.shape) < 2:
-                    y_array = y.values.reshape(-1, 1)
-                else:
-                    y_array = y.values
+            if isinstance(y, (pd.DataFrame, pd.Series)):
+                y_array = y.values.reshape(-1, 1) if len(y.shape) < 2 else y.values
                 scaled = scaler.transform(y_array)
                 if dataframe:
                     scaled = pd.DataFrame(scaled, index=y.index)
                 scaled_list.append(scaled)
             elif isinstance(y, np.ndarray):
-                if len(y.shape) < 2:
-                    y_array = y.reshape(-1, 1)
-                else:
-                    y_array = y
+                y_array = y.reshape(-1, 1) if len(y.shape) < 2 else y
                 scaled = scaler.transform(y_array)
                 scaled_list.append(scaled)
 
@@ -143,7 +135,7 @@ def rescale_sets(sample, *to_scale, dataframe=False):
     SCALING INVERSO
     """
     scaler = StandardScaler()
-    if isinstance(sample, pd.DataFrame) or isinstance(sample, pd.Series):
+    if isinstance(sample, (pd.DataFrame, pd.Series)):
         if len(sample.shape) < 2:
             sample = sample.values.reshape(-1, 1)
         else:
@@ -152,25 +144,19 @@ def rescale_sets(sample, *to_scale, dataframe=False):
         if len(sample.shape) < 2:
             sample = sample.reshape(-1, 1)
     scaler.fit(sample)
-    if len(to_scale) == 0:
+    if not to_scale:
         rescaled_list = scaler.inverse_transform(sample)
     else:
         rescaled_list = []
         for y in to_scale:
-            if isinstance(y, pd.DataFrame) or isinstance(y, pd.Series):
-                if len(y.shape) < 2:
-                    y_array = y.values.reshape(-1, 1)
-                else:
-                    y_array = y.values
+            if isinstance(y, (pd.DataFrame, pd.Series)):
+                y_array = y.values.reshape(-1, 1) if len(y.shape) < 2 else y.values
                 scaled = scaler.inverse_transform(y_array)
                 if dataframe:
                     scaled = pd.DataFrame(scaled, index=y.index)
                 rescaled_list.append(scaled)
             elif isinstance(y, np.ndarray):
-                if len(y.shape) < 2:
-                    y_array = y.reshape(-1, 1)
-                else:
-                    y_array = y
+                y_array = y.reshape(-1, 1) if len(y.shape) < 2 else y
                 scaled = scaler.inverse_transform(y_array)
                 rescaled_list.append(scaled)
 
@@ -178,9 +164,8 @@ def rescale_sets(sample, *to_scale, dataframe=False):
 
 
 def plot_imputation(x, y, eta=None, **kwargs):
-    suptitle = (kwargs.get('suptitle') if 'suptitle' in kwargs
-                else 'ETa Imputation')
-    title = kwargs.get('title') if 'title' in kwargs else None
+    suptitle = kwargs.get('suptitle', 'ETa Imputation')
+    title = kwargs.get('title', None)
     # Setup figure
     fig, ax = plt.subplots(figsize=(10, 6))
     fig.suptitle(suptitle, fontsize=18, weight='bold')
@@ -215,8 +200,8 @@ def get_folds_indexes(eta_idx, seed=6475):
     chunk = int(len(eta_idx)/KFOLDS)
     # Si esegue il programma prendendo di volta in volta come indici (date) dei
     # MaiVisti uno di questi KFOLDS intervalli
-    idx_test_list = [[] for k in range(KFOLDS)]
-    idx_train_list = [[] for k in range(KFOLDS)]
+    idx_test_list = [[] for _ in range(KFOLDS)]
+    idx_train_list = [[] for _ in range(KFOLDS)]
     for k in range(KFOLDS):
         idx_test = eta_idx[k*chunk: (k+1)*chunk]
         idx_test_list[k] = idx_test

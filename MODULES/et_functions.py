@@ -54,12 +54,12 @@ def remove_outliers(df_fit, df, model,
         df_fit = df_fit.values.reshape(-1,1)
         df = df.values.reshape(-1,1)
     if model == 'IsolationForest':
-        cntm = kwargs.get('contamination') if 'contamination' in kwargs else 0.1
+        cntm = kwargs.get('contamination', 0.1)
         model = IsolationForest(contamination = cntm)
     if model == 'LOF':
         model = LocalOutlierFactor()
     if model == 'SVM':
-        nu = kwargs.get('nu') if 'nu' in kwargs else 0.1
+        nu = kwargs.get('nu', 0.1)
         model = OneClassSVM(nu = nu)
     model.fit(df_fit)
     indexes = model.predict(df)
@@ -116,13 +116,10 @@ def make_dataframe(data, method=None, date_format='%Y-%m-%d', **kwargs):
         columns = kwargs['columns']
     except:
         columns = [col for col in db.columns if col != 'Day']
-    start = kwargs.get('start') if 'start' in kwargs else None
-    end = kwargs.get('end') if 'end' in kwargs else None
+    start = kwargs.get('start', None)
+    end = kwargs.get('end', None)
     df = filter_dates(db.loc[:, columns], start, end)
-    if 'drop_index' in kwargs:
-        drop = kwargs.get('drop_index')
-    else:
-        drop = False
+    drop = kwargs.get('drop_index', False)
     if method == 'drop':
         print('Dropping rows...')
         df = df.dropna().reset_index(level=0, drop=drop)
@@ -134,17 +131,8 @@ def make_dataframe(data, method=None, date_format='%Y-%m-%d', **kwargs):
                           columns=columns, index=df.index)
         if drop:
             df = df.reset_index(level=0, drop=True)
-    # elif method == 'iterative_impute':
-    #     print('Iterative Imputation')
-    #     target = kwargs['target']
-    #     target_measured = df.dropna()
-    #     imputer = KNNImputer(n_neighbors=5, weights="uniform")
-    #     cols = [col for col in columns if col != target]
-    #     df[cols] = imputer.fit_transform(df[cols])
-    #     df = ii.iterative_imputation(df, columns, target_measured)
-    else:
-        if drop:
-            df = df.reset_index(level=0, drop=True)
+    elif drop:
+        df = df.reset_index(level=0, drop=True)
 
     return df
 
@@ -174,8 +162,8 @@ def plot_axis(ax, *axis, plot_type='line', **kwargs):
         x = axe[0]
         y = axe[1]
         color = axe[2] if len(axe) == 3 else None
-        size = kwargs.get('size') if 'size' in kwargs else 20
-        alpha = kwargs.get('alpha') if 'alpha' in kwargs else 0.5
+        size = kwargs.get('size', 20)
+        alpha = kwargs.get('alpha', 0.5)
         if plot_type == 'scatter':
             plot = ax.scatter(x, y, alpha=alpha, c=color, s=size)
         elif plot_type == 'line':
@@ -195,16 +183,13 @@ def plot_axis(ax, *axis, plot_type='line', **kwargs):
         plot.set_label(kwargs.get('legend'))
     if 'date_ticks' in kwargs:
         ticks = kwargs.get('date_ticks')
-        if 'formatter' in kwargs:
-            formatter = kwargs.get('formatter')
-        else:
-            formatter = '%Y-%m'
+        formatter = kwargs.get('formatter', '%Y-%m')
         make_ticks_dates(ax, ticks, formatter)
     return ax
 
 
 def make_ticks_dates(ax, months, formatter):
-    month_list = [i for i in range(1, 13, months)]
+    month_list = list(range(1, 13, months))
     ax.xaxis.set_major_locator(mdates.MonthLocator(month_list))
     ax.xaxis.set_minor_locator(mdates.MonthLocator())
     ax.grid(True)
@@ -221,5 +206,4 @@ def mean_bias_error(y_true, y_pred):
     y_true = y_true.reshape(len(y_true), 1)
     y_pred = y_pred.reshape(len(y_pred), 1)
     diff = (y_true - y_pred)
-    mbe = diff.mean()
-    return mbe
+    return diff.mean()
